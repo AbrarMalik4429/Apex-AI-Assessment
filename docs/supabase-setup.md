@@ -5,18 +5,18 @@ Configured and verified on 2026-09-28.
 | Setting | Value |
 |---|---|
 | Project | Apex AI Arabia |
-| Project reference | epvhkhkjlytelsbnavjt |
-| Region | Singapore, ap-southeast-1 |
-| PostgreSQL | 17.6 |
+| Project reference | Set locally from your Supabase project |
+| Region | Choose for your deployment |
+| PostgreSQL | Use a supported PostgreSQL release |
 | Application schema | booking |
 | Runtime role | booking_runtime |
-| Working host | aws-0-ap-southeast-1.pooler.supabase.com |
+| Working host | Copy the session-pooler host from your project Connect panel |
 | Port / mode | 5432 / session pooling |
 | TLS | verify-full with Supabase's public CA |
 | Credential location | Backend's local .env; excluded from Git, Docker build and ZIP |
 | Alembic schema revision | 0ad7141776a3 |
 
-Project dashboard: [Apex AI Arabia](https://supabase.com/dashboard/project/epvhkhkjlytelsbnavjt).
+Deployment identifiers and endpoint details are intentionally omitted from this public checkpoint. Retrieve them from your own Supabase dashboard and store connection settings only in the local `.env`.
 
 ## Applied changes
 

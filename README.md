@@ -6,21 +6,23 @@ This is the booking portion of the Apex patient-service assessment: a Python RES
 
 **Not included:** preparation, insurance/general questions, RAG, human escalation delivery, OTP or production authentication, doctor-side schedule editing, symptom-to-specialty inference, variable appointment durations, comprehensive concurrency safety, multi-branch scheduling, and one-off extra slots. The demo endpoint intentionally grants access to one synthetic patient and must stay disabled outside a local synthetic demo. Natural-language quality is not measured by the mocked tests.
 
-**Live database verified:** Apex AI Arabia is provisioned, seeded and connected through Supabase's session pooler with certificate and hostname verification. Nine API/database smoke checks passed against PostgreSQL, with all test writes rolled back. The dedicated runtime login and local `.env` are configured on this machine. Groq still needs your key and a live-model check; Docker execution also remains unverified. See `docs/supabase-setup.md` for the current project setup.
+**Live database verified:** Apex AI Arabia is provisioned, seeded and connected through Supabase's session pooler with certificate and hostname verification. Nine API/database smoke checks passed against PostgreSQL, with all test writes rolled back. The dedicated runtime login and local `.env` are configured on this machine. Groq is configured locally and a live conversation smoke check passed; Docker execution remains unverified. See `docs/supabase-setup.md` for the current project setup.
 
 **Build next:** database locking/overlap constraints and concurrent-request tests; verified patient identity; deployment hardening and per-patient database authorization if needed; real-model evaluations with consented synthetic cases; broader multilingual/date ambiguity evaluations; coordinated doctor-side schedule changes; operation retention and monitoring; the remaining assessment families. A process-local mutex alone would not protect multiple backend workers.
 
-## Interactive demo
+## Chatbot demo
 
-Open http://127.0.0.1:8000/ after starting the server. The responsive patient portal creates a synthetic demo session automatically and supports doctor selection, date/time availability, booking confirmation, appointment lookup, rescheduling, cancellation and follow-up scheduling. It saves real changes to the synthetic demo database.
+Open http://127.0.0.1:8000/ after starting the server. All patient interactions happen in the conversation: booking, availability, appointment lookup, rescheduling, cancellation and existing follow-ups. Doctor/time choices, appointment cards and explicit confirmation buttons appear inline. You can also type replies such as `Option 1`, `yes`, or a new date. The page uses `/assistant/message` for every conversation action; the earlier guided endpoint remains available for API compatibility.
 
-The guided UI works without Groq: `/booking/propose` accepts validated structured selections and shares the existing confirmation, ownership, transaction and replay workflow. Natural-language `/assistant/message` requests still require a Groq key. No database credentials or provider keys are sent to the browser. The patient token stays in sessionStorage for the current browser tab. This is a demo portal, not production patient authentication.
+The Groq key is configured locally and a real-provider, rollback-isolated smoke test passed all six booking families. A fresh installation still needs its own key. Groq interprets natural language; Python enforces ownership, availability and booking policies. Exact numbered choices, reset and confirmation do not need model calls. Preparation, insurance/general knowledge and escalation delivery remain out of scope.
 
-No frontend build step is required; FastAPI serves `app/static`. Google Fonts is optional; system fonts are used if unavailable.
+The transcript and pending request are kept in sessionStorage for the browser tab. On an uncertain response, the chat blocks new actions and offers a retry with the identical request ID and payload, including after a reload. A expired session requires reconnection and checking existing appointments before repeating an uncertain change. No provider keys or database credentials are sent to the browser.
+
+No frontend build step is required; FastAPI serves `app/static`. Google Fonts is optional; system fonts are used if unavailable. This is a synthetic demo, not production patient authentication.
 
 ## Already configured on this machine
 
-The existing local `.env` contains the verified Supabase connection and generated backend credential. Do not overwrite it with `.env.example`. Add only your Groq key locally, then run the API from this folder:
+The existing local `.env` contains the verified Supabase connection and generated backend credential. Do not overwrite it with `.env.example`. Your Groq key is now configured locally. Run the API from this folder:
 
 ```powershell
 & '..\..\work\.venv\Scripts\python.exe' -m uvicorn app.main:app --host 127.0.0.1 --port 8000

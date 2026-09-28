@@ -16,7 +16,7 @@ Doctor-side schedules are assumed correct and non-overlapping. Patient appointme
 
 ## Remaining
 
-- Configure the Groq key locally and verify live model access and intent accuracy.
+- Expand real-model intent accuracy evaluations beyond the successful live smoke checks.
 - Verify Docker execution.
 - Implement production identity, concurrency controls and deployment hardening.
 - Build preparation instructions, insurance/general questions, RAG and escalation delivery.
@@ -25,3 +25,7 @@ Doctor-side schedules are assumed correct and non-overlapping. Patient appointme
 ## Repository contents
 
 The source, design documents, agreed workflow reference and verification record form this checkpoint. Credentials, local environment files, virtual environments and caches are excluded. A fresh clone requires its own local configuration; the configured database credential is not portable through Git.
+
+## Chatbot checkpoint
+
+Replaced the guided portal with conversational booking, inline options/cards/confirmation, tab-scoped history and safe uncertain-request retry. Groq is configured and verified locally. Six real-provider booking flows passed with database rollback; 54 automated tests pass.

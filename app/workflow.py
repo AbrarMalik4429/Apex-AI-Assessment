@@ -1,3 +1,4 @@
+import re
 import secrets
 from datetime import date, datetime, time, timedelta
 from uuid import UUID
@@ -94,11 +95,20 @@ class Workflow:
                 for o in state.get("options", [])
             ],
         }
-        parsed = (
-            structured
-            if structured is not None
-            else self.interpreter.interpret(request.message, context)
-        )
+        # Exact numbered replies refer to server-stored options. Resolve these
+        # deterministically so the model cannot copy option fields and invalidate
+        # the selection, and avoid a needless provider call for button clicks.
+        numbered = re.fullmatch(r"(?:book\s+)?(?:option\s+)?(\d+)", text)
+        if structured is None and numbered and state.get("options"):
+            fields = {field: None for field in Interpretation.model_fields}
+            fields.update(intent="continue", option_number=int(numbered.group(1)))
+            parsed = Interpretation(**fields)
+        else:
+            parsed = (
+                structured
+                if structured is not None
+                else self.interpreter.interpret(request.message, context)
+            )
         if parsed.intent == "unknown":
             self.session.state = {}
             return self.response(
@@ -127,6 +137,14 @@ class Workflow:
                 "clarification",
                 "Would you like to book, check availability, reschedule, cancel, or schedule a follow-up?",
             )
+        # Choosing an availability result starts booking without losing its options.
+        if (
+            state.get("action") == "availability"
+            and action == "book"
+            and state.get("stage") == "slot"
+            and parsed.option_number is not None
+        ):
+            state["action"] = "book"
         if state.get("action") != action:
             state = {}
         # A fresh message invalidates any previous confirmation even if fields stay the same.

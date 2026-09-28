@@ -49,3 +49,11 @@ The updated live PostgreSQL smoke script passed all nine checks, including an ac
 ## Patient frontend — 2026-09-29
 
 All 52 automated tests pass, including guided booking/replay, authorization, rescheduling, cancellation and follow-up flows without a model call. Playwright checked the live portal at desktop (1440px) and mobile (390px) widths, selected a time and opened the confirmation dialog. No JavaScript errors or horizontal mobile overflow were observed. The browser check did not confirm a live appointment.
+
+## Chatbot and live Groq update — 2026-09-29
+
+The root UI is now conversational. All 54 automated tests pass. A real Groq request verified authentication without exposing the credential. `python -m scripts.smoke_chat` passed natural-language availability, option selection and confirmation, appointment lookup, rescheduling, cancellation and follow-up scheduling against PostgreSQL; its database writes were rolled back. These are smoke checks, not a comprehensive model-quality evaluation.
+
+Live browser checks exercised booking → doctor choice → time choice → inline confirmation, then abandoned the proposal without booking. Desktop/mobile views had no JavaScript errors or horizontal overflow. A separate browser test with synthetic network responses verified typed `yes` attaches the proposal token and a lost response can be retried with the identical payload after reloading the tab. This supersedes the earlier record that Groq was unconfigured/unverified. Docker remains unverified.
+
+The live test found that model extraction could copy time fields when selecting an option. Exact numbered replies now resolve server-stored options without calling the model; a regression test covers that path and the availability-to-booking transition.

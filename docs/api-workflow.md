@@ -95,3 +95,7 @@ Appointment response objects now include nullable `slot_id`. Scheduled bookings 
 ## Guided demo portal
 
 `GET /` serves the patient UI. `GET /demo/config` returns public demo availability, clinic date/timezone, booking horizon and provider-configured status. `POST /booking/propose` takes request_id, action (book/reschedule/cancel/follow_up), and optional doctor_id, appointment_date, start_time, booking_id. It requires the same patient bearer session and returns the standard AssistantResponse. Selections go through the deterministic workflow without Groq. Confirm through `/assistant/message` using the returned confirmation token. Request replay fingerprints include all structured fields.
+
+## Chatbot interface
+
+The root page now uses `/assistant/message` for all patient actions. Exact numeric replies resolve against current server-stored options without a model call. Confirm buttons and typed confirmation attach the latest server-issued token. New requests disable older option cards. Browser sessionStorage retains the transcript, current confirmation and any unresolved request; uncertain failures require retrying that same payload before a new action. A start-over message clears backend workflow state, not appointment history.

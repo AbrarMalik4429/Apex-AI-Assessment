@@ -80,3 +80,29 @@ def test_reset_makes_proposal_unusable(harness):
         ]
         == "invalid_confirmation"
     )
+
+
+def test_book_option_after_availability_keeps_displayed_choices(harness):
+    from tests.conftest import intent
+    from tests.test_booking import send
+
+    client, _, fake, _ = harness
+    fake.queue.append(intent("availability", doctor_query="Amal", appointment_date="2026-10-08"))
+    options = send(client, "Show available times").json()
+    assert options["status"] == "options"
+    fake.queue.append(intent("book", option_number=1))
+    proposal = send(client, "Book the first option").json()
+    assert proposal["status"] == "confirmation_required"
+    assert proposal["data"]["candidate"]["slot_id"] == options["data"]["options"][0]["slot_id"]
+
+
+def test_numbered_chat_reply_uses_stored_options_without_model(harness):
+    from tests.conftest import intent
+    from tests.test_booking import send
+
+    client, _, fake, _ = harness
+    fake.queue.append(intent("availability", doctor_query="Amal", appointment_date="2026-10-08"))
+    send(client, "Show times")
+    result = send(client, "Book option 1").json()
+    assert result["status"] == "confirmation_required"
+    assert fake.calls == 1

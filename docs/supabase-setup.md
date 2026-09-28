@@ -47,7 +47,7 @@ The second command runs nine checks in a transaction that is always rolled back,
 
 ## Remaining setup
 
-Add your Groq key to `GROQ_API_KEY` in the existing local `.env`, keeping the database settings intact. Then start Uvicorn using the README instructions. Do not share the `.env` or overwrite it with the example file.
+The local Groq key is configured and live-tested. For another installation, set `GROQ_API_KEY` in its local `.env`, keeping database settings intact. Then start Uvicorn using the README instructions. Do not share the `.env` or overwrite it with the example file.
 
 Future schema changes need the Supabase administrator connector or a separate migration connection. The runtime login cannot perform migrations or doctor-side seed writes. Keep `DEMO_ENABLED=true` limited to this local synthetic demo.
 

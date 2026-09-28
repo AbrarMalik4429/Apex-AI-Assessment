@@ -1,17 +1,27 @@
 import hashlib
 import secrets
 from datetime import date, timedelta
+from pathlib import Path
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.booking_service import BookingService, aware, booking_data
 from app.config import Settings
-from app.contracts import AssistantResponse, DomainError, MessageRequest, ProviderError
+from app.contracts import (
+    AssistantResponse,
+    DomainError,
+    GuidedRequest,
+    Interpretation,
+    MessageRequest,
+    ProviderError,
+)
 from app.db import make_engine, make_session_factory
 from app.groq_client import GroqInterpreter
 from app.models import Operation, Patient, PatientSession, utcnow
@@ -150,8 +160,7 @@ def create_app(settings=None, session_factory=None, interpreter=None, clock=utcn
             BookingService(db, settings, session.patient_id, clock()).lookup(booking_id)
         )
 
-    @api.post("/assistant/message", response_model=AssistantResponse)
-    def message(body: MessageRequest, session=Depends(patient_session), db=Depends(database)):
+    def execute_message(body, session, db, structured=None):
         fingerprint = hashlib.sha256(body.model_dump_json().encode()).hexdigest()
         previous = db.get(Operation, (session.session_id, body.request_id))
         if previous:
@@ -160,7 +169,7 @@ def create_app(settings=None, session_factory=None, interpreter=None, clock=utcn
             return AssistantResponse.model_validate(previous.response)
         try:
             service = BookingService(db, settings, session.patient_id, clock())
-            result = Workflow(service, session, interpreter).handle(body)
+            result = Workflow(service, session, interpreter).handle(body, structured)
             db.add(
                 Operation(
                     session_id=session.session_id,
@@ -215,6 +224,41 @@ def create_app(settings=None, session_factory=None, interpreter=None, clock=utcn
                 data={"code": "database_outcome_unknown"},
             )
             return JSONResponse(status_code=503, content=result.model_dump(mode="json"))
+
+    @api.post("/assistant/message", response_model=AssistantResponse)
+    def message(body: MessageRequest, session=Depends(patient_session), db=Depends(database)):
+        return execute_message(body, session, db)
+
+    @api.post("/booking/propose", response_model=AssistantResponse)
+    def guided(body: GuidedRequest, session=Depends(patient_session), db=Depends(database)):
+        fields = {field: None for field in Interpretation.model_fields}
+        fields.update(
+            intent=body.action,
+            doctor_query=str(body.doctor_id) if body.doctor_id else None,
+            appointment_date=body.appointment_date.isoformat() if body.appointment_date else None,
+            start_time=body.start_time.isoformat() if body.start_time else None,
+            booking_id=str(body.booking_id) if body.booking_id else None,
+        )
+        # Canonical structured input participates in the same durable replay fingerprint.
+        request = MessageRequest(request_id=body.request_id, message=body.model_dump_json())
+        return execute_message(request, session, db, Interpretation(**fields))
+
+    @api.get("/demo/config")
+    def demo_config():
+        return {
+            "demo_enabled": settings.demo_enabled,
+            "timezone": settings.clinic_timezone,
+            "today": clock().astimezone(ZoneInfo(settings.clinic_timezone)).date(),
+            "horizon_days": settings.booking_horizon_days,
+            "groq_configured": bool(settings.groq_api_key.get_secret_value()),
+        }
+
+    static = Path(__file__).parent / "static"
+    api.mount("/static", StaticFiles(directory=static), name="static")
+
+    @api.get("/", include_in_schema=False)
+    def frontend():
+        return FileResponse(static / "index.html")
 
     return api
 

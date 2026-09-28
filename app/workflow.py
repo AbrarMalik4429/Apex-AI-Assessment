@@ -3,11 +3,11 @@ from datetime import date, datetime, time, timedelta
 from uuid import UUID
 
 from app.booking_service import BookingService, booking_data
-from app.contracts import AssistantResponse, Candidate, DomainError, MessageRequest
+from app.contracts import AssistantResponse, Candidate, DomainError, Interpretation, MessageRequest
 from app.groq_client import Interpreter
 from app.models import PatientSession
 
-CONFIRM_WORDS = {"yes", "confirm", "yes confirm", "نعم", "تأكيد"}
+CONFIRM_WORDS = {"yes", "confirm", "yes confirm", "Ù†Ø¹Ù…", "ØªØ£ÙƒÙŠØ¯"}
 
 
 class Workflow:
@@ -30,9 +30,11 @@ class Workflow:
             confirmation_token=token,
         )
 
-    def handle(self, request: MessageRequest) -> AssistantResponse:
+    def handle(
+        self, request: MessageRequest, structured: Interpretation | None = None
+    ) -> AssistantResponse:
         try:
-            return self._handle(request)
+            return self._handle(request, structured)
         except DomainError as exc:
             self.session.state = {}
             return self.response(request, exc.status, exc.message, {"code": exc.code})
@@ -45,8 +47,10 @@ class Workflow:
                 {"code": "invalid_interpretation"},
             )
 
-    def _handle(self, request: MessageRequest) -> AssistantResponse:
-        text = request.message.strip().casefold().rstrip(".!؟")
+    def _handle(
+        self, request: MessageRequest, structured: Interpretation | None = None
+    ) -> AssistantResponse:
+        text = request.message.strip().casefold().rstrip(".!ØŸ")
         if text in {"reset", "start over", "stop", "never mind"}:
             self.session.state = {}
             return self.response(
@@ -54,7 +58,7 @@ class Workflow:
                 "clarification",
                 "The current request was cleared. What would you like to do?",
             )
-        state = dict(self.session.state or {})
+        state = {} if structured is not None else dict(self.session.state or {})
         if request.confirmation_token is not None:
             return self.confirm(request, state, text)
         if text in CONFIRM_WORDS:
@@ -90,7 +94,11 @@ class Workflow:
                 for o in state.get("options", [])
             ],
         }
-        parsed = self.interpreter.interpret(request.message, context)
+        parsed = (
+            structured
+            if structured is not None
+            else self.interpreter.interpret(request.message, context)
+        )
         if parsed.intent == "unknown":
             self.session.state = {}
             return self.response(

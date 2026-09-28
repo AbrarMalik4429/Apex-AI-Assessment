@@ -91,3 +91,7 @@ Rate-limit and temporary server failures get at most one short retry. Long Retry
 ## Slot identity and conflicts
 
 Appointment response objects now include nullable `slot_id`. Scheduled bookings store the selected weekly slot; pending follow-ups return null. The database permits only one confirmed booking per `(slot_id, appointment_date)`. If a competing write claims that key after availability validation, confirmation returns HTTP 409, status `unavailable`, and code `slot_unavailable`; the failed transaction is rolled back. Choose another time. Cancellation and rescheduling release the old key while retaining history.
+
+## Guided demo portal
+
+`GET /` serves the patient UI. `GET /demo/config` returns public demo availability, clinic date/timezone, booking horizon and provider-configured status. `POST /booking/propose` takes request_id, action (book/reschedule/cancel/follow_up), and optional doctor_id, appointment_date, start_time, booking_id. It requires the same patient bearer session and returns the standard AssistantResponse. Selections go through the deterministic workflow without Groq. Confirm through `/assistant/message` using the returned confirmation token. Request replay fingerprints include all structured fields.

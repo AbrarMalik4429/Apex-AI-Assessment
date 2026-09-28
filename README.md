@@ -10,6 +10,14 @@ This is the booking portion of the Apex patient-service assessment: a Python RES
 
 **Build next:** database locking/overlap constraints and concurrent-request tests; verified patient identity; deployment hardening and per-patient database authorization if needed; real-model evaluations with consented synthetic cases; broader multilingual/date ambiguity evaluations; coordinated doctor-side schedule changes; operation retention and monitoring; the remaining assessment families. A process-local mutex alone would not protect multiple backend workers.
 
+## Interactive demo
+
+Open http://127.0.0.1:8000/ after starting the server. The responsive patient portal creates a synthetic demo session automatically and supports doctor selection, date/time availability, booking confirmation, appointment lookup, rescheduling, cancellation and follow-up scheduling. It saves real changes to the synthetic demo database.
+
+The guided UI works without Groq: `/booking/propose` accepts validated structured selections and shares the existing confirmation, ownership, transaction and replay workflow. Natural-language `/assistant/message` requests still require a Groq key. No database credentials or provider keys are sent to the browser. The patient token stays in sessionStorage for the current browser tab. This is a demo portal, not production patient authentication.
+
+No frontend build step is required; FastAPI serves `app/static`. Google Fonts is optional; system fonts are used if unavailable.
+
 ## Already configured on this machine
 
 The existing local `.env` contains the verified Supabase connection and generated backend credential. Do not overwrite it with `.env.example`. Add only your Groq key locally, then run the API from this folder:

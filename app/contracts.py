@@ -76,3 +76,13 @@ class ProviderError(Exception):
         self.code = code
         self.retry_after = retry_after
         super().__init__(code)
+
+
+class GuidedRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request_id: UUID
+    action: Literal["book", "reschedule", "cancel", "follow_up"]
+    doctor_id: UUID | None = None
+    appointment_date: date | None = None
+    start_time: time | None = None
+    booking_id: UUID | None = None

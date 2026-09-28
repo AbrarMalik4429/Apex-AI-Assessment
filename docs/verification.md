@@ -45,3 +45,7 @@ The final performance-advisor pass contained only [unused-index informational no
 Added migration `603768ba3dac`, the `bookings.slot_id` foreign key, and a unique confirmed `(slot_id, appointment_date)` index. All 49 automated tests pass, including seven new regression tests for duplicate rejection, date reuse, cancellation reuse, required slot identity, follow-ups, API conflict handling and reschedule rollback. The earlier 42-test record above describes the initial checkpoint.
 
 The updated live PostgreSQL smoke script passed all nine checks, including an actual duplicate insert rejected by `uq_bookings_confirmed_slot_date`. All smoke writes were rolled back. Supabase confirms migration `603768ba3dac`, no scheduled booking without a slot, and no security advisor findings. Ruff, compilation and offline Alembic SQL generation passed.
+
+## Patient frontend — 2026-09-29
+
+All 52 automated tests pass, including guided booking/replay, authorization, rescheduling, cancellation and follow-up flows without a model call. Playwright checked the live portal at desktop (1440px) and mobile (390px) widths, selected a time and opened the confirmation dialog. No JavaScript errors or horizontal mobile overflow were observed. The browser check did not confirm a live appointment.

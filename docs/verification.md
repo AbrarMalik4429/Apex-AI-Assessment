@@ -39,3 +39,9 @@ The full unit suite still uses SQLite and mocked provider responses. The separat
 Concurrency safety and production authentication are explicitly outside this build. Passing sequential SQLite tests does not establish those guarantees.
 
 The final performance-advisor pass contained only [unused-index informational notices](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index). The three missing foreign-key indexes were resolved. A final query confirmed zero smoke-test sessions/operations and the original completed visit plus pending follow-up were intact.
+
+## Slot identity and uniqueness update — 2026-09-29
+
+Added migration `603768ba3dac`, the `bookings.slot_id` foreign key, and a unique confirmed `(slot_id, appointment_date)` index. All 49 automated tests pass, including seven new regression tests for duplicate rejection, date reuse, cancellation reuse, required slot identity, follow-ups, API conflict handling and reschedule rollback. The earlier 42-test record above describes the initial checkpoint.
+
+The updated live PostgreSQL smoke script passed all nine checks, including an actual duplicate insert rejected by `uq_bookings_confirmed_slot_date`. All smoke writes were rolled back. Supabase confirms migration `603768ba3dac`, no scheduled booking without a slot, and no security advisor findings. Ruff, compilation and offline Alembic SQL generation passed.

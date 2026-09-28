@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Time,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
@@ -94,6 +95,7 @@ class Booking(Base):
     booking_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("booking.patient.patient_id"))
     doctor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("booking.doctor.doctor_id"))
+    slot_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("booking.slot.slot_id"))
     appointment_date: Mapped[date | None] = mapped_column(Date)
     booked_day_of_week: Mapped[int | None] = mapped_column(Integer)
     booked_start_time: Mapped[time | None] = mapped_column(Time)
@@ -128,6 +130,19 @@ class Booking(Base):
         CheckConstraint("dependent_on_booking_id != booking_id", name="booking_not_own_parent"),
         Index("ix_bookings_doctor_date_status", "doctor_id", "appointment_date", "status"),
         Index("ix_bookings_patient_date_status", "patient_id", "appointment_date", "status"),
+        CheckConstraint(
+            "(slot_id IS NULL AND appointment_date IS NULL) OR (slot_id IS NOT NULL AND appointment_date IS NOT NULL)",
+            name="booking_slot_time",
+        ),
+        Index("ix_bookings_slot", "slot_id"),
+        Index(
+            "uq_bookings_confirmed_slot_date",
+            "slot_id",
+            "appointment_date",
+            unique=True,
+            postgresql_where=text("status = 'confirmed'"),
+            sqlite_where=text("status = 'confirmed'"),
+        ),
         Index("ix_bookings_parent", "dependent_on_booking_id"),
         Index("ix_bookings_replacement", "superseded_by_booking_id"),
     )

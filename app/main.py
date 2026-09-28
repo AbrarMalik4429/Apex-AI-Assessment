@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.booking_service import BookingService, aware, booking_data
 from app.config import Settings
@@ -183,6 +183,28 @@ def create_app(settings=None, session_factory=None, interpreter=None, clock=utcn
             return JSONResponse(
                 status_code=503, content=result.model_dump(mode="json"), headers=headers
             )
+        except IntegrityError as exc:
+            db.rollback()
+            constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+            sqlite_slot_conflict = (
+                "UNIQUE constraint failed: bookings.slot_id, bookings.appointment_date"
+                in str(exc.orig)
+            )
+            if constraint == "uq_bookings_confirmed_slot_date" or sqlite_slot_conflict:
+                result = AssistantResponse(
+                    request_id=body.request_id,
+                    status="unavailable",
+                    message="That time was booked by another request. Please choose another time.",
+                    data={"code": "slot_unavailable"},
+                )
+                return JSONResponse(status_code=409, content=result.model_dump(mode="json"))
+            result = AssistantResponse(
+                request_id=body.request_id,
+                status="error",
+                message="The appointment change violated a database constraint. No change was saved.",
+                data={"code": "database_constraint_violation"},
+            )
+            return JSONResponse(status_code=409, content=result.model_dump(mode="json"))
         except SQLAlchemyError:
             db.rollback()
             # A commit failure can mean its acknowledgement was lost. Never claim failure/success.

@@ -19,6 +19,7 @@ def booking_data(booking: Booking) -> dict:
     return {
         "booking_id": str(booking.booking_id),
         "doctor_id": str(booking.doctor_id),
+        "slot_id": str(booking.slot_id) if booking.slot_id else None,
         "appointment_date": booking.appointment_date.isoformat()
         if booking.appointment_date
         else None,
@@ -196,6 +197,7 @@ class BookingService:
             )
 
     def apply_time(self, booking: Booking, candidate: Candidate) -> None:
+        booking.slot_id = candidate.slot_id
         booking.appointment_date = candidate.appointment_date
         booking.booked_day_of_week = candidate.appointment_date.weekday()
         booking.booked_start_time = candidate.start_time
@@ -256,9 +258,12 @@ class BookingService:
             dependent_on_booking_id=old.dependent_on_booking_id,
         )
         self.apply_time(new, candidate)
+        # Release the old key before inserting, including a same-slot reschedule.
+        # Both changes remain in the enclosing transaction and roll back together.
+        old.status = "rescheduled"
+        self.db.flush()
         self.db.add(new)
         self.db.flush()
-        old.status = "rescheduled"
         old.superseded_by_booking_id = new.booking_id
         self.db.flush()
         return new

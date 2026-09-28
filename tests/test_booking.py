@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.booking_service import BookingService
 from app.contracts import DomainError, ProviderError
-from app.models import Booking, Operation, PatientSession
+from app.models import Booking, Operation, PatientSession, Slot
 from app.seed import DOCTOR_1, DOCTOR_2, FOLLOW_UP_ID, OTHER_PATIENT_ID, PATIENT_ID
 from tests.conftest import NOW, intent
 
@@ -28,7 +28,20 @@ def add_booking(
     status="confirmed",
 ):
     with factory.begin() as db:
+        slot = db.scalar(
+            select(Slot).where(
+                Slot.doctor_id == doctor,
+                Slot.day_of_week == day.weekday(),
+                Slot.start_time == start,
+                Slot.end_time == end,
+            )
+        )
+        if slot is None:
+            slot = Slot(doctor_id=doctor, day_of_week=day.weekday(), start_time=start, end_time=end)
+            db.add(slot)
+            db.flush()
         booking = Booking(
+            slot_id=slot.slot_id,
             patient_id=patient,
             doctor_id=doctor,
             appointment_date=day,

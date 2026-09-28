@@ -47,12 +47,22 @@ def seed(db, settings: Settings, now=None):
                 db.add(
                     Slot(doctor_id=doctor_id, day_of_week=weekday, start_time=start, end_time=end)
                 )
+    db.flush()
     past = today - timedelta(days=14)
+    past_slot = db.scalar(
+        select(Slot.slot_id).where(
+            Slot.doctor_id == DOCTOR_1,
+            Slot.day_of_week == past.weekday(),
+            Slot.start_time == time(9),
+            Slot.end_time == time(9, 30),
+        )
+    )
     db.add(
         Booking(
             booking_id=PARENT_ID,
             patient_id=PATIENT_ID,
             doctor_id=DOCTOR_1,
+            slot_id=past_slot,
             appointment_date=past,
             booked_day_of_week=past.weekday(),
             booked_start_time=time(9),

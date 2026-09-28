@@ -31,7 +31,7 @@ This is a deliberate simplification for the 48-hour scope. The full design inten
 | `doctor` | `doctor_id` (PK), `doctor_name`, `specialty_1`, `specialty_2`, `specialty_3` | up to 3 specialties |
 | `slot` | `slot_id` (PK), `doctor_id` (FK), `day_of_week`, `start_time`, `end_time` | recurring weekly template; read-only from this service |
 | `doctor_leave` | `leave_id` (PK), `doctor_id` (FK), `start_datetime`, `end_datetime`, `reason` (nullable) | supports half-day leave via datetime range; read-only from this service; expired rows filtered out at query time (no archive job — see Section 7) |
-| `bookings` | `booking_id` (PK), `patient_id` (FK), `doctor_id` (FK), `appointment_date` (nullable), `booked_day_of_week`, `booked_start_time`, `booked_end_time`, `type`, `dependent_on_booking_id` (FK, nullable), `status`, `notes` | source of truth for whether a doctor is taken at a given time; time fields are snapshotted at booking time, decoupled from `slot` |
+| `bookings` | `booking_id` (PK), `patient_id` (FK), `doctor_id` (FK), `slot_id` (FK, nullable until scheduled), `appointment_date` (nullable), `booked_day_of_week`, `booked_start_time`, `booked_end_time`, `type`, `dependent_on_booking_id` (FK, nullable), `status`, `notes` | source of truth for whether a doctor is taken at a given time; time fields are snapshotted at booking time; scheduled bookings reference `slot` |
 
 `bookings.status` values: `confirmed`, `pending_scheduling`, `cancelled`, `no_show`, `completed`, `rescheduled`.
 
@@ -148,7 +148,7 @@ flowchart TD
 - **Identity**: session-based `patient_id` is sufficient for this demo; full phone + OTP verification is deferred (Section 8).
 - **Scheduling window**: default availability horizon is 90 days; this is a configurable value, not specified by the brief.
 - **Doctor schedule ownership and correctness**: `slot` and `doctor_leave` are populated and maintained by a separate doctor-facing service; this assistant only reads them. That service is assumed to work correctly and ensure each doctor's slot templates are valid and non-overlapping. Bookings use the supplied slot boundaries. Doctor-side schedule validation is outside this scope; filtering already-booked slots and the patient's own conflicts remains in scope.
-- **Concurrency**: the current demo assumes booking mutations are not submitted simultaneously for competing slots or the same patient. Availability is checked before display and again before writing, but mutex locking and database race-condition protection are not implemented in this phase.
+- **Concurrency**: the current demo assumes booking mutations are not submitted simultaneously for competing slots or the same patient. Availability is checked before display and again before writing, but same-slot/date uniqueness is now enforced by the database; mutex locking and broader race-condition protection remain deferred.
 - **Leave archiving**: expired `doctor_leave` rows are excluded via a query-time filter (`end_datetime >= NOW()`), not a scheduled archive job — appropriate for this scale; revisited under production architecture.
 - **24-hour policy**: applied to both cancellation and rescheduling, though the brief's disclosed "surprise scenario" only confirms this for cancellation. Treating reschedule the same way is a judgment call, stated here explicitly rather than assumed silently.
 - **Single location/branch**: no multi-branch or location-based routing is modeled; out of scope for this assessment.
@@ -162,4 +162,8 @@ flowchart TD
 
 - **OTP verification**: phone number capture, OTP generation/hashing, expiry, attempt-limiting, and binding a verified phone number to a `patient_id` before a session is trusted with any patient-specific data. The session-based ID used in this demo is a stand-in for the trust boundary this would establish in production.
 - **Doctor-leave archiving job**: move expired `doctor_leave` rows to a cold table on a schedule, once table volume at production scale makes the query-time filter costly.
-- **Slot-utilization traceability**: if doctor-side analytics are ever needed, reintroduce a non-enforced `slot_id` reference on `bookings` purely for traceability, without recreating a hard dependency between the two tables.
+- **Slot identity implemented (2026-09-29)**: scheduled bookings now store a foreign key to `slot`. A partial unique index on `(slot_id, appointment_date)` for confirmed bookings prevents duplicate occupancy. Cancelled/rescheduled records retain their slot reference without blocking reuse; pending follow-ups have null slot/date until scheduled.
+
+## Slot/date schema update — 2026-09-29
+
+This update supersedes earlier statements deferring all database race protection. The confirmed slot/date unique index is implemented, with safe backfill and conflict responses. Cross-slot patient overlaps, concurrent changes to one booking/session, and concurrent request replay remain deferred.

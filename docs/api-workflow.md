@@ -87,3 +87,7 @@ The fixed API destination is `https://api.groq.com/openai/v1/chat/completions`. 
 Model output is only an interpretation. Ownership, date horizons, interval conflicts, allowed status changes, notice policy, confirmation and commit success are Python/database decisions. Structured output improves parsing reliability, not medical or semantic correctness.
 
 Rate-limit and temporary server failures get at most one short retry. Long Retry-After values return immediately with a 503 and header. No raw provider error text is returned. Sequential database retries use the operation record; simultaneous requests remain outside the current guarantees.
+
+## Slot identity and conflicts
+
+Appointment response objects now include nullable `slot_id`. Scheduled bookings store the selected weekly slot; pending follow-ups return null. The database permits only one confirmed booking per `(slot_id, appointment_date)`. If a competing write claims that key after availability validation, confirmation returns HTTP 409, status `unavailable`, and code `slot_unavailable`; the failed transaction is rolled back. Choose another time. Cancellation and rescheduling release the old key while retaining history.

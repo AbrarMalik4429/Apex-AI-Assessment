@@ -30,6 +30,6 @@ Run `python -m pytest -q` for deterministic evaluation. Cases below specify expe
 | 24 | “Previous doctor, tomorrow afternoon” | Resolve from session patient's completed history; afternoon options only. |
 | 25 | Change doctor after a proposal | Previous confirmation becomes invalid; use new doctor options. |
 
-Highest-risk deferred behaviour: simultaneous patients competing for the same doctor slot or simultaneous requests for one patient's schedule. These may still double-book because concurrency controls were explicitly deferred. Atomic rollback and sequential request replay do not eliminate this risk.
+The database now rejects two confirmed bookings for the same slot/date. Regression tests exercise duplicate inserts and API conflict handling after stale validation. Broader parallel-request evaluations remain deferred: one patient can still race bookings for different overlapping slots, and concurrent updates can race booking/session state. Atomic rollback and sequential replay do not eliminate those risks.
 
 Live-model evaluation remains necessary for Arabic, ambiguous dates, negation, reference resolution and adversarial intent extraction. The deterministic tests prove downstream boundaries even when the interpreted request is adversarial; they do not prove the model always interprets language correctly.

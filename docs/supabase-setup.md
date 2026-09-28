@@ -14,7 +14,7 @@ Configured and verified on 2026-09-28.
 | Port / mode | 5432 / session pooling |
 | TLS | verify-full with Supabase's public CA |
 | Credential location | Backend's local .env; excluded from Git, Docker build and ZIP |
-| Alembic schema revision | 0ad7141776a3 |
+| Alembic schema revision | 603768ba3dac |
 
 Deployment identifiers and endpoint details are intentionally omitted from this public checkpoint. Retrieve them from your own Supabase dashboard and store connection settings only in the local `.env`.
 
@@ -43,7 +43,7 @@ From the backend folder:
 & '..\..\work\.venv\Scripts\python.exe' -m scripts.smoke_database
 ```
 
-The second command runs eight checks in a transaction that is always rolled back, using synthetic data and mocked language interpretation. It does not call Groq or change the demo fixtures permanently.
+The second command runs nine checks in a transaction that is always rolled back, using synthetic data and mocked language interpretation. It does not call Groq or change the demo fixtures permanently.
 
 ## Remaining setup
 

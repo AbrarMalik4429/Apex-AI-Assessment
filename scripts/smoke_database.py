@@ -6,17 +6,18 @@ Run from the backend directory: python -m scripts.smoke_database
 
 import json
 from datetime import timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from app.config import Settings
 from app.contracts import Interpretation
 from app.db import make_engine
 from app.main import create_app
-from app.models import utcnow
-from app.seed import DOCTOR_1, DOCTOR_2, FOLLOW_UP_ID
+from app.models import Booking, utcnow
+from app.seed import DOCTOR_1, DOCTOR_2, FOLLOW_UP_ID, OTHER_PATIENT_ID
 
 
 class ScriptedInterpreter:
@@ -101,6 +102,33 @@ def main():
                     assert confirm(payload) == booked
                     checks.extend(["confirmed booking", "idempotent replay"])
                     old_id = booked["data"]["booking"]["booking_id"]
+                    assert booked["data"]["booking"]["slot_id"] == first["slot_id"]
+                    with factory() as db:
+                        existing = db.get(Booking, UUID(old_id))
+                        values = {
+                            field: getattr(existing, field)
+                            for field in (
+                                "doctor_id",
+                                "slot_id",
+                                "appointment_date",
+                                "booked_day_of_week",
+                                "booked_start_time",
+                                "booked_end_time",
+                                "type",
+                                "status",
+                            )
+                        }
+                        try:
+                            with db.begin_nested():
+                                db.add(Booking(patient_id=OTHER_PATIENT_ID, **values))
+                                db.flush()
+                        except IntegrityError as exc:
+                            assert (
+                                exc.orig.diag.constraint_name == "uq_bookings_confirmed_slot_date"
+                            )
+                        else:
+                            raise AssertionError("PostgreSQL accepted a duplicate slot/date")
+                    checks.append("PostgreSQL rejects another patient's duplicate slot/date")
                     changed = confirm(propose("reschedule", second, old_id))
                     new_id = changed["data"]["booking"]["booking_id"]
                     assert client.get(f"/appointments/{old_id}").json()["status"] == "rescheduled"

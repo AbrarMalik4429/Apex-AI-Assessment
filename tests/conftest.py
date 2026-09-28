@@ -1,4 +1,5 @@
 import os
+import runpy
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -54,6 +55,11 @@ def harness(tmp_path):
             for statement in ddl.split(";"):
                 if statement.strip():
                     connection.execute(text(statement))
+            migration = runpy.run_path(
+                "migrations/versions/603768ba3dac_booking_slot_date_uniqueness.py"
+            )
+            for statement in migration["UPGRADE_SQL"]:
+                connection.execute(text(statement.replace("booking.", schema + ".")))
         engine = engine.execution_options(schema_translate_map={"booking": schema})
     else:
 

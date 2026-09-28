@@ -8,11 +8,11 @@
 - Added ownership checks, explicit confirmation, sequential request replay and atomic transactions.
 - Provisioned and seeded the Apex AI Arabia Supabase database with synthetic data; configured a restricted runtime login and verified TLS connection locally.
 - Supplied migrations, dependency locks, Docker configuration, demo client, OpenAPI specification and setup documentation.
-- Recorded 42 passing automated tests and eight rollback-isolated live PostgreSQL API smoke checks. See verification.md for evidence and limitations.
+- Recorded 49 passing automated tests and nine rollback-isolated live PostgreSQL API/database smoke checks. See verification.md for evidence and limitations.
 
 ## Agreed scope
 
-Doctor-side schedules are assumed correct and non-overlapping. Patient appointments filter overlapping times across all doctors. Database locking and concurrent-request race prevention are future work; sequential replay and atomic writes do not establish concurrency safety.
+Doctor-side schedules are assumed correct and non-overlapping. Patient appointments filter overlapping times across all doctors. Same-slot/date conflicts are now prevented by a partial unique index. Database locking and broader concurrent-request race prevention are future work; sequential replay and atomic writes do not establish concurrency safety.
 
 ## Remaining
 

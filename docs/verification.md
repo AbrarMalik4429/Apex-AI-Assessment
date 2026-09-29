@@ -67,3 +67,9 @@ The original slot/date is omitted from rescheduling options. Explicit requests f
 All 64 automated tests pass. New coverage checks 80 templates (eight per weekday per doctor), exact date/weekday/time matching, no weekend options, calendar month-end/leap-year calculations, range conflict filtering, preserved option selection and persistence of the displayed date/time on confirmation.
 
 Live Supabase verification confirms eight templates for each weekday 0–4 for both doctors. `python -m scripts.smoke_date_windows` passed real Groq/PostgreSQL requests: October 7 (8 options), October 7–20 (20 sampled options), and 'after two months' resolved from September 30 to November 30–December 13 (20 sampled options). Confirming a selected option preserved its slot, date and start/end times. All smoke-test database writes were rolled back.
+
+## Conversational date refinements — 2026-09-30
+
+Natural-language extraction distinguishes days from today (`days_after`), offsets from the current date/window (`shift_days`), and weekday-only refinements (`requested_weekday`, Monday=0). Python calculates dates. Weekday-only requests select that weekday on or after the date being discussed, or filter an existing range. A chosen proposal supplies the next refinement anchor. Unavailable exact dates are stated explicitly and retained so another refinement can continue.
+
+All 67 automated tests pass. A live Groq check with a disposable local database passed: two weeks later → October 14; a day later → October 15; Thursday → October 15; Saturday → October 17 unavailable; Monday → October 19. No live database records were changed by this check.

@@ -82,6 +82,9 @@ class Workflow:
             "appointment_date": state.get("appointment_date"),
             "date_from": state.get("date_from"),
             "date_to": state.get("date_to"),
+            "start_time": state.get("start_time"),
+            "time_preference": state.get("time_preference"),
+            "requested_weekday": state.get("requested_weekday"),
             "options": [
                 {
                     k: v
@@ -114,6 +117,54 @@ class Workflow:
                 else self.interpreter.interpret(request.message, context)
             )
         today = self.service.now.astimezone(self.service.zone).date()
+        if parsed.days_after is not None:
+            parsed = parsed.model_copy(
+                update={
+                    "appointment_date": (today + timedelta(days=parsed.days_after)).isoformat(),
+                    "date_from": None,
+                    "date_to": None,
+                }
+            )
+        if parsed.shift_days is not None:
+            anchor = state.get("appointment_date") or state.get("date_from")
+            if anchor is None:
+                return self.response(
+                    request, "clarification", "Which date should I move forward or back from?"
+                )
+            start = date.fromisoformat(anchor) + timedelta(days=parsed.shift_days)
+            if state.get("appointment_date"):
+                parsed = parsed.model_copy(
+                    update={
+                        "appointment_date": start.isoformat(),
+                        "date_from": None,
+                        "date_to": None,
+                    }
+                )
+            else:
+                end = (
+                    date.fromisoformat(state["date_to"])
+                    if state.get("date_to")
+                    else default_window_end(
+                        date.fromisoformat(anchor),
+                        today,
+                        self.service.settings.booking_horizon_days,
+                    )
+                )
+                parsed = parsed.model_copy(
+                    update={
+                        "appointment_date": None,
+                        "date_from": start.isoformat(),
+                        "date_to": (end + timedelta(days=parsed.shift_days)).isoformat(),
+                    }
+                )
+        if parsed.requested_weekday is not None and not (
+            state.get("date_from") or parsed.date_from or parsed.date_to
+        ):
+            anchor = date.fromisoformat(
+                parsed.appointment_date or state.get("appointment_date") or today.isoformat()
+            )
+            target = anchor + timedelta(days=(parsed.requested_weekday - anchor.weekday()) % 7)
+            parsed = parsed.model_copy(update={"appointment_date": target.isoformat()})
         if parsed.months_after is not None:
             start = add_months(today, parsed.months_after)
             parsed = parsed.model_copy(
@@ -161,13 +212,20 @@ class Workflow:
             and parsed.option_number is not None
         ):
             state["action"] = "book"
-        if state.get("action") != action:
+        if state.get("action") != action and not (
+            {state.get("action"), action} <= {"book", "availability"}
+        ):
             state = {}
         # A fresh message invalidates any previous confirmation even if fields stay the same.
         state.pop("proposal", None)
         state.pop("confirmation_token", None)
         state.pop("expires_at", None)
         state["action"] = action
+        if any(
+            value is not None
+            for value in (parsed.appointment_date, parsed.date_from, parsed.date_to)
+        ):
+            state.pop("requested_weekday", None)
         # A new date criterion replaces the previous exact date or range.
         if parsed.appointment_date is not None:
             state.pop("date_from", None)
@@ -210,6 +268,9 @@ class Workflow:
         if parsed.time_preference is not None and parsed.start_time is None:
             state.pop("start_time", None)
 
+        if parsed.requested_weekday is not None:
+            state["requested_weekday"] = parsed.requested_weekday
+            changed_selection = True
         selected_slot = None
         if parsed.option_number is not None:
             # Do not resolve a stale option against newly changed criteria.
@@ -334,8 +395,19 @@ class Workflow:
                 range_start if is_range else day,
                 range_end if is_range else day,
                 exclude,
-                limit=None if is_range or requested_time or state.get("time_preference") else 20,
+                limit=None
+                if is_range
+                or requested_time
+                or state.get("time_preference")
+                or state.get("requested_weekday") is not None
+                else 20,
             )
+            if state.get("requested_weekday") is not None:
+                candidates = [
+                    c
+                    for c in candidates
+                    if c.appointment_date.weekday() == state["requested_weekday"]
+                ]
             period = state.get("time_preference")
             if period:
                 low, high = {"morning": (0, 12), "afternoon": (12, 17), "evening": (17, 24)}[period]
@@ -352,7 +424,13 @@ class Workflow:
                 return self.response(
                     request,
                     "unavailable",
-                    "No available times match that request. Please try another date or doctor.",
+                    (
+                        f"No available appointments match your request on {day}. Please choose another date or doctor."
+                        if day
+                        else f"No available appointments match your request between {range_start} and {range_end}. Please choose another date range or doctor."
+                        if is_range
+                        else "No available times match that request. Please try another date or doctor."
+                    ),
                 )
             if action == "availability" or not (day and requested_time and len(candidates) == 1):
                 return self.options(
@@ -388,6 +466,11 @@ class Workflow:
             "appointment_type": appointment_type,
             "booking_id": state.get("booking_id"),
         }
+        # Subsequent date refinements must anchor to the choice being confirmed.
+        state["appointment_date"] = selected_slot.appointment_date.isoformat()
+        state["start_time"] = selected_slot.start_time.isoformat()
+        state.pop("date_from", None)
+        state.pop("date_to", None)
         return self.propose(
             request,
             state,

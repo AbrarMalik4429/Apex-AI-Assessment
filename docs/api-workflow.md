@@ -103,3 +103,9 @@ The root page now uses `/assistant/message` for all patient actions. Exact numer
 ## Date windows
 
 The Groq interpretation schema now accepts nullable `date_from`, `date_to` and `months_after` in addition to an exact `appointment_date`. Month offsets are resolved in Python using the clinic current date. Ranges are inclusive; an unspecified end uses a 14-day window bounded by the booking horizon. Range results are a random sample of up to 20 valid dated slots, ordered for display and frozen in session state until the next request changes criteria. Exact-date results show all matching available slots up to the existing 20-option limit. The public message request and confirmation contracts are unchanged.
+
+## Conversational date refinements — 2026-09-30
+
+Natural-language extraction distinguishes days from today (`days_after`), offsets from the current date/window (`shift_days`), and weekday-only refinements (`requested_weekday`, Monday=0). Python calculates dates. Weekday-only requests select that weekday on or after the date being discussed, or filter an existing range. A chosen proposal supplies the next refinement anchor. Unavailable exact dates are stated explicitly and retained so another refinement can continue.
+
+All 67 automated tests pass. A live Groq check with a disposable local database passed: two weeks later → October 14; a day later → October 15; Thursday → October 15; Saturday → October 17 unavailable; Monday → October 19. No live database records were changed by this check.

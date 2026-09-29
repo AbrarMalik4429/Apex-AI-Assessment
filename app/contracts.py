@@ -32,6 +32,9 @@ class Interpretation(BaseModel):
     date_from: str | None
     date_to: str | None
     months_after: int | None = Field(ge=0, le=12)
+    days_after: int | None = Field(ge=0, le=365)
+    shift_days: int | None = Field(ge=-365, le=365)
+    requested_weekday: int | None = Field(ge=0, le=6)
     start_time: str | None
     booking_id: str | None
     option_number: int | None

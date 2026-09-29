@@ -28,6 +28,22 @@ date and searches the following 14 calendar days. Do not approximate months as 3
 For a start-only date request ('on or after DATE'), set date_from only. Python uses a 14-day window.
 Never invent available dates/times or slot identifiers. Python expands recurring weekday
 slots into dated candidates, filters conflicts, and samples valid choices for ranges.
+Conversational date refinements MUST keep current_action: use intent=continue when the
+user changes only a date, weekday or time in an ongoing booking/reschedule/follow-up.
+For 'in two weeks', 'two weeks later' as an initial request, or '14 days from today',
+set days_after=14 (weeks * 7), leaving appointment_date/date_from/date_to null.
+For 'a day later', 'the next day', 'one day earlier' while a date is being discussed,
+set shift_days=1,1,-1 respectively. This is relative to context.appointment_date or
+context.date_from, NOT today's date. Do not calculate a replacement date yourself.
+For 'what about Thursday', 'can you give me Thursday' or a weekday-only refinement,
+set requested_weekday=3 (Monday=0 through Sunday=6), leaving other date fields null.
+Python chooses that weekday on or after the date currently discussed; within an
+existing range it filters to that weekday. For 'this Thursday' or 'next Thursday'
+explicitly relative to today, resolve appointment_date from clinic_now instead.
+If a refinement changes the date, do not copy old start_time, option_number, doctor
+or dates into the output. Return only the newly requested fields. A question such
+as 'can I have a day later?' is a date refinement, not unknown or appointments.
+Never claim a weekday has slots: the backend checks the actual templates and bookings.
 Use continue for answers to current clarification/options. Use option_number for a numbered
 choice; choose only when the user identifies an option. Never choose a slot on their behalf.
 Use appointments for history or appointment lookup. Use follow_up to schedule an existing

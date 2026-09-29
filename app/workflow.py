@@ -1,3 +1,4 @@
+import random
 import re
 import secrets
 from datetime import date, datetime, time, timedelta
@@ -5,6 +6,7 @@ from uuid import UUID
 
 from app.booking_service import BookingService, booking_data
 from app.contracts import AssistantResponse, Candidate, DomainError, Interpretation, MessageRequest
+from app.date_windows import add_months, default_window_end
 from app.groq_client import Interpreter
 from app.models import PatientSession
 
@@ -78,6 +80,8 @@ class Workflow:
             "stage": state.get("stage"),
             "doctor_query": state.get("doctor_query"),
             "appointment_date": state.get("appointment_date"),
+            "date_from": state.get("date_from"),
+            "date_to": state.get("date_to"),
             "options": [
                 {
                     k: v
@@ -108,6 +112,18 @@ class Workflow:
                 structured
                 if structured is not None
                 else self.interpreter.interpret(request.message, context)
+            )
+        today = self.service.now.astimezone(self.service.zone).date()
+        if parsed.months_after is not None:
+            start = add_months(today, parsed.months_after)
+            parsed = parsed.model_copy(
+                update={
+                    "appointment_date": None,
+                    "date_from": start.isoformat(),
+                    "date_to": default_window_end(
+                        start, today, self.service.settings.booking_horizon_days
+                    ).isoformat(),
+                }
             )
         if parsed.intent == "unknown":
             self.session.state = {}
@@ -152,11 +168,23 @@ class Workflow:
         state.pop("confirmation_token", None)
         state.pop("expires_at", None)
         state["action"] = action
+        # A new date criterion replaces the previous exact date or range.
+        if parsed.appointment_date is not None:
+            state.pop("date_from", None)
+            state.pop("date_to", None)
+        elif parsed.date_from is not None or parsed.date_to is not None:
+            state.pop("appointment_date", None)
+            state.pop("date_from", None)
+            state.pop("date_to", None)
+            if parsed.start_time is None:
+                state.pop("start_time", None)
         changed_selection = False
         for field in (
             "doctor_query",
             "specialty",
             "appointment_date",
+            "date_from",
+            "date_to",
             "start_time",
             "booking_id",
             "appointment_type",
@@ -279,6 +307,14 @@ class Workflow:
         day = (
             date.fromisoformat(state["appointment_date"]) if state.get("appointment_date") else None
         )
+        range_start = date.fromisoformat(state["date_from"]) if state.get("date_from") else None
+        range_end = date.fromisoformat(state["date_to"]) if state.get("date_to") else None
+        is_range = range_start is not None or range_end is not None
+        if is_range:
+            range_start = range_start or today
+            range_end = range_end or default_window_end(
+                range_start, today, self.service.settings.booking_horizon_days
+            )
         requested_time = (
             time.fromisoformat(state["start_time"]) if state.get("start_time") else None
         )
@@ -295,10 +331,10 @@ class Workflow:
         if selected_slot is None:
             candidates = self.service.availability(
                 UUID(state["doctor_id"]),
-                day,
-                day,
+                range_start if is_range else day,
+                range_end if is_range else day,
                 exclude,
-                limit=None if requested_time or state.get("time_preference") else 20,
+                limit=None if is_range or requested_time or state.get("time_preference") else 20,
             )
             period = state.get("time_preference")
             if period:
@@ -306,7 +342,11 @@ class Workflow:
                 candidates = [c for c in candidates if low <= c.start_time.hour < high]
             if requested_time:
                 candidates = [c for c in candidates if c.start_time == requested_time]
-            candidates = candidates[:20]
+            if is_range and len(candidates) > 20:
+                candidates = random.SystemRandom().sample(candidates, 20)
+                candidates.sort(key=lambda c: (c.appointment_date, c.start_time, str(c.slot_id)))
+            else:
+                candidates = candidates[:20]
             if not candidates:
                 self.session.state = state
                 return self.response(
@@ -320,7 +360,12 @@ class Workflow:
                     state,
                     "slot",
                     [c.model_dump(mode="json") for c in candidates],
-                    "These times are available and do not overlap your appointments. Choose an option number to continue.",
+                    (
+                        f"Here is a selection of available times from {range_start} to {range_end}. "
+                        "These do not overlap your appointments. Choose an option number to continue."
+                    )
+                    if is_range
+                    else "These times are available and do not overlap your appointments. Choose an option number to continue.",
                 )
             selected_slot = candidates[0]
         if selected_slot.doctor_id != UUID(state["doctor_id"]):

@@ -40,8 +40,17 @@ def seed(db, settings: Settings, now=None):
     )
     db.flush()
     for doctor_id in [DOCTOR_1, DOCTOR_2]:
-        for weekday in range(7):
-            for hour, minute in [(9, 0), (9, 30), (10, 0), (10, 30), (14, 0), (14, 30)]:
+        for weekday in range(5):
+            for hour, minute in [
+                (9, 0),
+                (9, 30),
+                (10, 0),
+                (10, 30),
+                (11, 0),
+                (11, 30),
+                (14, 0),
+                (14, 30),
+            ]:
                 start = time(hour, minute)
                 end = time(hour + (minute + 30) // 60, (minute + 30) % 60)
                 db.add(
@@ -49,6 +58,8 @@ def seed(db, settings: Settings, now=None):
                 )
     db.flush()
     past = today - timedelta(days=14)
+    while past.weekday() >= 5:
+        past -= timedelta(days=1)
     past_slot = db.scalar(
         select(Slot.slot_id).where(
             Slot.doctor_id == DOCTOR_1,

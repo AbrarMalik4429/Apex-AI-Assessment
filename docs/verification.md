@@ -61,3 +61,9 @@ The live test found that model extraction could copy time fields when selecting 
 ## Same-time reschedule restriction — 2026-09-30
 
 The original slot/date is omitted from rescheduling options. Explicit requests for the same slot/date return `same_appointment_time` before confirmation and are rejected again by the booking service before writing. The same recurring slot on another date remains valid. All 56 automated tests pass. Cancelled and rescheduled records do not block availability; their former times are shown only if current template, future-time, leave and confirmed-booking checks pass.
+
+## Weekday schedule and date-range update — 2026-09-30
+
+All 64 automated tests pass. New coverage checks 80 templates (eight per weekday per doctor), exact date/weekday/time matching, no weekend options, calendar month-end/leap-year calculations, range conflict filtering, preserved option selection and persistence of the displayed date/time on confirmation.
+
+Live Supabase verification confirms eight templates for each weekday 0–4 for both doctors. `python -m scripts.smoke_date_windows` passed real Groq/PostgreSQL requests: October 7 (8 options), October 7–20 (20 sampled options), and 'after two months' resolved from September 30 to November 30–December 13 (20 sampled options). Confirming a selected option preserved its slot, date and start/end times. All smoke-test database writes were rolled back.

@@ -89,7 +89,7 @@ def test_doctor_occupancy_and_half_day_leave(harness):
         params={"doctor_id": str(DOCTOR_1), "start": "2026-10-09", "end": "2026-10-09"},
     ).json()
     times = [s["start_time"] for s in result["slots"]]
-    assert times == ["10:30:00", "14:00:00", "14:30:00"]
+    assert times == ["10:30:00", "11:00:00", "11:30:00", "14:00:00", "14:30:00"]
 
 
 def test_clarification_selection_confirmation_and_retry(harness):

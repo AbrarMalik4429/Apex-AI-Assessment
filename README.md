@@ -63,7 +63,7 @@ Open [Swagger API documentation](http://127.0.0.1:8000/docs). In another activat
 python scripts/demo_client.py
 ```
 
-Try: `Book Dr. Amal tomorrow afternoon`, choose a numbered time, then type `confirm`. The client attaches the returned confirmation token. Type `retry` after an uncertain response; it reuses the identical request ID and payload. `reset` clears the pending workflow. It never prints your API key or session token.
+Try: `Book Dr. Amal after two months`, `Book Dr. Amal between 2026-11-02 and 2026-11-13`, or `Book Dr. Amal tomorrow afternoon`, choose a numbered time, then type `confirm`. The client attaches the returned confirmation token. Type `retry` after an uncertain response; it reuses the identical request ID and payload. `reset` clears the pending workflow. It never prints your API key or session token.
 
 ## Supabase database setup
 

@@ -29,6 +29,9 @@ class Interpretation(BaseModel):
     doctor_query: str | None
     specialty: str | None
     appointment_date: str | None
+    date_from: str | None
+    date_to: str | None
+    months_after: int | None = Field(ge=0, le=12)
     start_time: str | None
     booking_id: str | None
     option_number: int | None

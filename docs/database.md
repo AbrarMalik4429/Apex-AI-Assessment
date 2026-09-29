@@ -63,3 +63,13 @@ Tables live in a private `booking` schema, with PUBLIC schema privileges revoked
 ## Same-time reschedule restriction — 2026-09-30
 
 The original slot/date is omitted from rescheduling options. Explicit requests for the same slot/date return `same_appointment_time` before confirmation and are rejected again by the booking service before writing. The same recurring slot on another date remains valid. All 56 automated tests pass. Cancelled and rescheduled records do not block availability; their former times are shown only if current template, future-time, leave and confirmed-booking checks pass.
+
+## Weekday templates and calculated dates — 2026-09-30
+
+Each synthetic doctor has eight 30-minute templates per weekday, Monday–Friday: 09:00, 09:30, 10:00, 10:30, 11:00, 11:30, 14:00 and 14:30 (clinic time). There are 40 templates per doctor and 80 total. Existing leave and bookings still filter actual availability.
+
+For an exact date, Python `date.weekday()` selects matching templates and returns that date plus the template start/end times. For an inclusive range, Python enumerates each date and performs the same matching and conflict checks. It randomly samples up to 20 valid options, then sorts the selection by date/time for display. The selected options are stored in conversation state; replying with an option number does not rerandomize them.
+
+For 'after N months', Groq extracts `months_after`; Python adds calendar months, clamping the day to the last day of the target month where necessary. The default search covers that calculated start date and the next 13 days, within the configured booking horizon. A user-specified range overrides the default window. No matching weekend templates means no weekend options. Confirmation saves the displayed date, slot and start/end snapshots after revalidation.
+
+Fresh databases use `python -m app.seed`. For the existing synthetic database, `scripts/seed_weekday_schedule.sql` reconciles weekday templates through an administrator connection, retains existing matching slot IDs and removes unreferenced weekend templates.

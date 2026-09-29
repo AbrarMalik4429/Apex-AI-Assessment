@@ -22,7 +22,7 @@ Deployment identifiers and endpoint details are intentionally omitted from this 
 
 Created seven application tables: patient, doctor, slot, doctor_leave, bookings, patient_session and operation. Added the migration version table, checks, foreign keys and query/relationship indexes. Enabled RLS and restricted schema access. No pre-existing application tables were present.
 
-Loaded synthetic fixtures: 2 patients, 2 doctors, 84 recurring weekly slots, 1 leave interval, 1 completed visit and 1 pending follow-up. No real patient records were used.
+Loaded synthetic fixtures: 2 patients, 2 doctors, 80 recurring weekly slots, 1 leave interval, 1 completed visit and 1 pending follow-up. No real patient records were used.
 
 The approved runtime login can read doctor/schedule/leave/patient tables, read/insert/update bookings and sessions, and read/insert operation records. It cannot delete, edit doctor schedules, manage schemas/roles or bypass RLS. It can read the Alembic version for diagnostics. Patient ownership remains enforced by Python. The account password was generated locally and was not displayed in chat.
 

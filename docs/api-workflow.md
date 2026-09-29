@@ -99,3 +99,7 @@ Appointment response objects now include nullable `slot_id`. Scheduled bookings 
 ## Chatbot interface
 
 The root page now uses `/assistant/message` for all patient actions. Exact numeric replies resolve against current server-stored options without a model call. Confirm buttons and typed confirmation attach the latest server-issued token. New requests disable older option cards. Browser sessionStorage retains the transcript, current confirmation and any unresolved request; uncertain failures require retrying that same payload before a new action. A start-over message clears backend workflow state, not appointment history.
+
+## Date windows
+
+The Groq interpretation schema now accepts nullable `date_from`, `date_to` and `months_after` in addition to an exact `appointment_date`. Month offsets are resolved in Python using the clinic current date. Ranges are inclusive; an unspecified end uses a 14-day window bounded by the booking horizon. Range results are a random sample of up to 20 valid dated slots, ordered for display and frozen in session state until the next request changes criteria. Exact-date results show all matching available slots up to the existing 20-option limit. The public message request and confirmation contracts are unchanged.

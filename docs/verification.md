@@ -57,3 +57,7 @@ The root UI is now conversational. All 54 automated tests pass. A real Groq requ
 Live browser checks exercised booking → doctor choice → time choice → inline confirmation, then abandoned the proposal without booking. Desktop/mobile views had no JavaScript errors or horizontal overflow. A separate browser test with synthetic network responses verified typed `yes` attaches the proposal token and a lost response can be retried with the identical payload after reloading the tab. This supersedes the earlier record that Groq was unconfigured/unverified. Docker remains unverified.
 
 The live test found that model extraction could copy time fields when selecting an option. Exact numbered replies now resolve server-stored options without calling the model; a regression test covers that path and the availability-to-booking transition.
+
+## Same-time reschedule restriction — 2026-09-30
+
+The original slot/date is omitted from rescheduling options. Explicit requests for the same slot/date return `same_appointment_time` before confirmation and are rejected again by the booking service before writing. The same recurring slot on another date remains valid. All 56 automated tests pass. Cancelled and rescheduled records do not block availability; their former times are shown only if current template, future-time, leave and confirmed-booking checks pass.

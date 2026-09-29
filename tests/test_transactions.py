@@ -1,3 +1,4 @@
+from datetime import time
 from uuid import uuid4
 
 from sqlalchemy import event, select
@@ -33,7 +34,7 @@ def test_commit_acknowledgement_lost_replays_saved_result(harness, monkeypatch):
 
 def test_reschedule_write_error_rolls_back_replacement(harness):
     client, factory, fake, _ = harness
-    original = add_booking(factory)
+    original = add_booking(factory, start=time(10), end=time(10, 30))
     proposal = propose(client, fake, "reschedule", booking_id=str(original))
 
     def fail_after_insert(db, flush_context):

@@ -165,9 +165,9 @@ def test_cancellation_boundary(harness, offset, allowed):
             assert db.get(Booking, booking_id).status == "confirmed"
 
 
-def test_reschedule_replaces_atomically_and_excludes_self(harness):
+def test_reschedule_replaces_atomically(harness):
     client, factory, fake, _ = harness
-    original = add_booking(factory)
+    original = add_booking(factory, start=time(10), end=time(10, 30))
     proposal = propose(client, fake, "reschedule", booking_id=str(original))
     result = send(client, "confirm", confirmation_token=proposal["confirmation_token"]).json()
     assert result["status"] == "success"

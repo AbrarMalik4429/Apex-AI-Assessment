@@ -285,6 +285,13 @@ class Workflow:
         if requested_time and requested_time.tzinfo:
             raise ValueError("use local time")
         exclude = UUID(state["booking_id"]) if action == "reschedule" else None
+        if action == "reschedule" and day and requested_time:
+            if day == booking.appointment_date and requested_time == booking.booked_start_time:
+                raise DomainError(
+                    "same_appointment_time",
+                    "This is already your appointment time. Please choose a different date or time.",
+                    "clarification",
+                )
         if selected_slot is None:
             candidates = self.service.availability(
                 UUID(state["doctor_id"]),
@@ -324,6 +331,8 @@ class Workflow:
             )
         if action == "availability":
             state["action"] = action = "book"
+        if action == "reschedule":
+            self.service.check_reschedule_target(booking, selected_slot)
         self.service.revalidate(selected_slot, exclude)
         appointment_type = state.get("appointment_type", "consultation")
         if len(appointment_type) > 100:

@@ -149,6 +149,12 @@ class BookingService:
             for slot in slots:
                 if slot.day_of_week != day.weekday():
                     continue
+                if (
+                    exclude_booking_id is not None
+                    and slot.slot_id == excluded.slot_id
+                    and day == excluded.appointment_date
+                ):
+                    continue
                 candidate_start = datetime.combine(day, slot.start_time, self.zone)
                 candidate_end = datetime.combine(day, slot.end_time, self.zone)
                 if candidate_start <= self.now:
@@ -241,8 +247,20 @@ class BookingService:
         self.db.flush()
         return booking
 
+    def check_reschedule_target(self, booking: Booking, candidate: Candidate) -> None:
+        if (
+            booking.slot_id == candidate.slot_id
+            and booking.appointment_date == candidate.appointment_date
+        ):
+            raise DomainError(
+                "same_appointment_time",
+                "This is already your appointment time. Please choose a different date or time.",
+                "clarification",
+            )
+
     def reschedule(self, booking_id: UUID, candidate: Candidate) -> Booking:
         old = self.lookup(booking_id)
+        self.check_reschedule_target(old, candidate)
         self.check_change(old, "reschedule")
         if old.doctor_id != candidate.doctor_id:
             raise DomainError(
@@ -258,7 +276,7 @@ class BookingService:
             dependent_on_booking_id=old.dependent_on_booking_id,
         )
         self.apply_time(new, candidate)
-        # Release the old key before inserting, including a same-slot reschedule.
+        # Release the old key before inserting the replacement.
         # Both changes remain in the enclosing transaction and roll back together.
         old.status = "rescheduled"
         self.db.flush()

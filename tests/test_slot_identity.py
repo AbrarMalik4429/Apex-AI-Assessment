@@ -87,3 +87,55 @@ def test_reschedule_constraint_failure_preserves_original(harness, monkeypatch):
         old = db.get(Booking, original)
         assert old.status == "confirmed"
         assert old.superseded_by_booking_id is None
+
+
+def test_same_slot_date_reschedule_is_rejected_before_proposal(harness):
+    from tests.conftest import intent
+
+    client, factory, fake, _ = harness
+    original = add_booking(factory)
+    fake.queue.append(
+        intent(
+            "reschedule",
+            booking_id=str(original),
+            appointment_date="2026-10-08",
+            start_time="09:00",
+        )
+    )
+    result = send(client).json()
+    assert result["data"]["code"] == "same_appointment_time"
+    assert result["confirmation_token"] is None
+    with factory() as db:
+        assert db.get(Booking, original).status == "confirmed"
+        assert db.get(Booking, original).superseded_by_booking_id is None
+
+
+def test_same_slot_date_is_hidden_and_rejected_at_write(harness):
+    from app.contracts import Candidate, DomainError
+
+    client, factory, _, settings = harness
+    original = add_booking(factory)
+    with factory.begin() as db:
+        old = db.get(Booking, original)
+        service = BookingService(db, settings, PATIENT_ID, NOW)
+        options = service.availability(
+            old.doctor_id, old.appointment_date, old.appointment_date, original
+        )
+        assert all(c.slot_id != old.slot_id for c in options)
+        candidate = Candidate(
+            doctor_id=old.doctor_id,
+            doctor_name="Dr. Amal Demo",
+            slot_id=old.slot_id,
+            appointment_date=old.appointment_date,
+            start_time=old.booked_start_time,
+            end_time=old.booked_end_time,
+        )
+        with pytest.raises(DomainError) as error:
+            service.reschedule(original, candidate)
+        assert error.value.code == "same_appointment_time"
+        assert old.status == "confirmed"
+        # Same recurring template on another matching date remains valid.
+        candidate.appointment_date += timedelta(days=7)
+        replacement = service.reschedule(original, candidate)
+        assert replacement.slot_id == old.slot_id
+        assert replacement.appointment_date != old.appointment_date

@@ -59,3 +59,7 @@ The database now prevents two confirmed bookings sharing a slot/date, including 
 ## Supabase access
 
 Tables live in a private `booking` schema, with PUBLIC schema privileges revoked and RLS enabled without public-client policies. Do not expose this schema through Supabase Data API. Only the Python backend holds the database connection credentials. The configured Supabase runtime role has no RLS bypass and only the approved table privileges/policies. These policies trust the server to act across its patients; service ownership checks remain essential. This build does not claim end-user Supabase Auth/RLS integration. The credential-free grant script is `scripts/runtime_access.sql`; login activation and password provisioning are separate administrative operations, already completed on Apex AI Arabia with user approval.
+
+## Same-time reschedule restriction — 2026-09-30
+
+The original slot/date is omitted from rescheduling options. Explicit requests for the same slot/date return `same_appointment_time` before confirmation and are rejected again by the booking service before writing. The same recurring slot on another date remains valid. All 56 automated tests pass. Cancelled and rescheduled records do not block availability; their former times are shown only if current template, future-time, leave and confirmed-booking checks pass.

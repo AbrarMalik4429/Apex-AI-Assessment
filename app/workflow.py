@@ -8,14 +8,23 @@ from app.booking_service import BookingService, booking_data
 from app.contracts import AssistantResponse, Candidate, DomainError, Interpretation, MessageRequest
 from app.date_windows import add_months, default_window_end
 from app.groq_client import Interpreter
+from app.knowledge import EMERGENCY, KnowledgeBase, knowledge_request_kind
 from app.models import PatientSession
+from app.security import emergency_signal, injection_attempt
 
 CONFIRM_WORDS = {"yes", "confirm", "yes confirm", "Ù†Ø¹Ù…", "ØªØ£ÙƒÙŠØ¯"}
 
 
 class Workflow:
-    def __init__(self, service: BookingService, session: PatientSession, interpreter: Interpreter):
+    def __init__(
+        self,
+        service: BookingService,
+        session: PatientSession,
+        interpreter: Interpreter,
+        knowledge=None,
+    ):
         self.service, self.session, self.interpreter = service, session, interpreter
+        self.knowledge = knowledge or KnowledgeBase(service.settings)
 
     def response(
         self,
@@ -62,6 +71,17 @@ class Workflow:
                 "The current request was cleared. What would you like to do?",
             )
         state = {} if structured is not None else dict(self.session.state or {})
+        if structured is None and emergency_signal(request.message):
+            self.session.state = {}
+            return self.response(request, "clarification", EMERGENCY, {"kind": "emergency"})
+        if structured is None and injection_attempt(request.message):
+            self.session.state = {}
+            return self.response(
+                request,
+                "clarification",
+                "I can help with appointments and supported knowledge questions, but cannot override safeguards, reveal secrets or access another patient's records.",
+                {"code": "unsafe_request"},
+            )
         if request.confirmation_token is not None:
             return self.confirm(request, state, text)
         if text in CONFIRM_WORDS:
@@ -78,6 +98,7 @@ class Workflow:
             "timezone": self.service.settings.clinic_timezone,
             "current_action": state.get("action"),
             "stage": state.get("stage"),
+            "previous_knowledge_question": state.get("knowledge_query"),
             "doctor_query": state.get("doctor_query"),
             "appointment_date": state.get("appointment_date"),
             "date_from": state.get("date_from"),
@@ -105,8 +126,28 @@ class Workflow:
         # Exact numbered replies refer to server-stored options. Resolve these
         # deterministically so the model cannot copy option fields and invalidate
         # the selection, and avoid a needless provider call for button clicks.
+        explicit_id = re.fullmatch(
+            r"(cancel appointment|reschedule appointment|schedule my follow-up|appointment) ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+            text,
+        )
         numbered = re.fullmatch(r"(?:book\s+)?(?:option\s+)?(\d+)", text)
-        if structured is None and numbered and state.get("options"):
+        if structured is None and explicit_id:
+            fields = {field: None for field in Interpretation.model_fields}
+            fields.update(
+                intent={
+                    "cancel appointment": "cancel",
+                    "reschedule appointment": "reschedule",
+                    "schedule my follow-up": "follow_up",
+                    "appointment": "continue",
+                }[explicit_id.group(1)],
+                booking_id=explicit_id.group(2),
+            )
+            parsed = Interpretation(**fields)
+        elif structured is None and knowledge_request_kind(request.message):
+            fields = {field: None for field in Interpretation.model_fields}
+            fields.update(intent="knowledge")
+            parsed = Interpretation(**fields)
+        elif structured is None and numbered and state.get("options"):
             fields = {field: None for field in Interpretation.model_fields}
             fields.update(intent="continue", option_number=int(numbered.group(1)))
             parsed = Interpretation(**fields)
@@ -117,6 +158,58 @@ class Workflow:
                 else self.interpreter.interpret(request.message, context)
             )
         today = self.service.now.astimezone(self.service.zone).date()
+        if parsed.intent in {"emergency", "refuse"}:
+            self.session.state = {}
+            return self.response(
+                request,
+                "clarification",
+                EMERGENCY
+                if parsed.intent == "emergency"
+                else "I cannot override safeguards, reveal secrets or access another patient's information.",
+                {"kind": parsed.intent},
+            )
+        if parsed.intent == "knowledge":
+            # Information never authorizes a pending mutation. Keep date/doctor context,
+            # but require a fresh proposal after this conversational detour.
+            for key in ("proposal", "confirmation_token", "expires_at"):
+                state.pop(key, None)
+            if state.get("stage") == "confirmation":
+                state.pop("stage", None)
+            query = request.message
+            if re.match(r"(?:and\b|what about\b|how about\b|does it\b|is it\b)", text):
+                previous = state.get("knowledge_query", "").casefold()
+                insurers = [
+                    name for name in ("bupa", "tawuniya", "medgulf", "rajhi") if name in previous
+                ]
+                if len(insurers) == 1 and not any(
+                    name in text for name in ("bupa", "tawuniya", "medgulf", "rajhi")
+                ):
+                    query = insurers[0] + ": " + query
+            answer, data = self.knowledge.answer(query, self.interpreter, today)
+            state["knowledge_query"] = query[:500]
+            self.session.state = state
+            return self.response(request, "success", answer, data)
+        if parsed.booking_id is not None:
+            # IDs from model output must literally occur in the current user message.
+            # UI option numbers are resolved separately against server-owned options.
+            try:
+                identifier = str(UUID(parsed.booking_id))
+            except ValueError:
+                self.session.state = {}
+                return self.response(
+                    request,
+                    "clarification",
+                    "Please choose an appointment option or copy its full booking UUID. Labels such as ID_1 are not booking IDs.",
+                    {"code": "invalid_booking_id"},
+                )
+            if structured is None and identifier not in request.message.casefold():
+                self.session.state = {}
+                return self.response(
+                    request,
+                    "clarification",
+                    "Please select the appointment or provide its full booking UUID.",
+                    {"code": "untrusted_booking_id"},
+                )
         if parsed.days_after is not None:
             parsed = parsed.model_copy(
                 update={
@@ -190,10 +283,13 @@ class Workflow:
                 if parsed.booking_id
                 else self.service.appointments()
             )
+            bookings = [b for b in bookings if b.status in {"confirmed", "pending_scheduling"}]
             return self.response(
                 request,
                 "success",
-                "Here are your appointments.",
+                "Here are your active appointments."
+                if bookings
+                else "You have no matching active appointments.",
                 {"appointments": [booking_data(b) for b in bookings]},
             )
 
@@ -479,6 +575,7 @@ class Workflow:
             {
                 "candidate": selected_slot.model_dump(mode="json"),
                 "appointment_type": appointment_type,
+                **({"original_booking": booking_data(booking)} if action == "reschedule" else {}),
             },
         )
 

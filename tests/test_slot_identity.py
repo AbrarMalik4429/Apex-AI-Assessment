@@ -102,7 +102,7 @@ def test_same_slot_date_reschedule_is_rejected_before_proposal(harness):
             start_time="09:00",
         )
     )
-    result = send(client).json()
+    result = send(client, f"Reschedule booking {original} to the same time").json()
     assert result["data"]["code"] == "same_appointment_time"
     assert result["confirmation_token"] is None
     with factory() as db:

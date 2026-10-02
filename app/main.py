@@ -1,14 +1,13 @@
 import hashlib
 import secrets
 from datetime import date, timedelta
-from pathlib import Path
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -24,6 +23,7 @@ from app.contracts import (
 )
 from app.db import make_engine, make_session_factory
 from app.groq_client import GroqInterpreter
+from app.knowledge import KnowledgeBase
 from app.models import Operation, Patient, PatientSession, utcnow
 from app.workflow import Workflow
 
@@ -39,12 +39,21 @@ def create_app(settings=None, session_factory=None, interpreter=None, clock=utcn
     settings = settings or Settings()
     factory = session_factory or make_session_factory(make_engine(settings))
     interpreter = interpreter or GroqInterpreter(settings)
+    knowledge = KnowledgeBase(settings)
     api = FastAPI(
         title="Patient Booking Backend",
         version="0.1.0",
         description="Groq interprets requests; Python validates and executes confirmed booking actions.",
     )
     api.state.session_factory = factory
+    if settings.frontend_url:
+        api.add_middleware(
+            CORSMiddleware,
+            allow_origins=[settings.frontend_url],
+            allow_methods=["GET", "POST"],
+            allow_headers=["Authorization", "Content-Type"],
+            expose_headers=["Retry-After"],
+        )
 
     def database():
         with factory() as db:
@@ -169,7 +178,7 @@ def create_app(settings=None, session_factory=None, interpreter=None, clock=utcn
             return AssistantResponse.model_validate(previous.response)
         try:
             service = BookingService(db, settings, session.patient_id, clock())
-            result = Workflow(service, session, interpreter).handle(body, structured)
+            result = Workflow(service, session, interpreter, knowledge).handle(body, structured)
             db.add(
                 Operation(
                     session_id=session.session_id,
@@ -253,12 +262,9 @@ def create_app(settings=None, session_factory=None, interpreter=None, clock=utcn
             "groq_configured": bool(settings.groq_api_key.get_secret_value()),
         }
 
-    static = Path(__file__).parent / "static"
-    api.mount("/static", StaticFiles(directory=static), name="static")
-
     @api.get("/", include_in_schema=False)
-    def frontend():
-        return FileResponse(static / "index.html")
+    def root():
+        return {"service": "Apex booking API", "docs": "/docs", "health": "/health"}
 
     return api
 

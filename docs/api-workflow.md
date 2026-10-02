@@ -82,7 +82,7 @@ Rescheduling retains the doctor and appointment type. It preserves the original 
 
 ## Groq configuration and failure handling
 
-The fixed API destination is `https://api.groq.com/openai/v1/chat/completions`. Keys remain in server configuration; redirects are not followed. Strict JSON schema and no tools/streaming avoid mixing unsupported provider features. JSON object mode is an explicit configuration option, not an automatic fallback.
+The configured API destination is `https://api.groq.com/openai/v1/chat/completions`. Keys remain in server configuration; redirects are not followed. Strict JSON schema and no tools/streaming avoid mixing unsupported provider features. JSON object mode is an explicit configuration option, not an automatic fallback.
 
 Model output is only an interpretation. Ownership, date horizons, interval conflicts, allowed status changes, notice policy, confirmation and commit success are Python/database decisions. Structured output improves parsing reliability, not medical or semantic correctness.
 
@@ -109,3 +109,15 @@ The Groq interpretation schema now accepts nullable `date_from`, `date_to` and `
 Natural-language extraction distinguishes days from today (`days_after`), offsets from the current date/window (`shift_days`), and weekday-only refinements (`requested_weekday`, Monday=0). Python calculates dates. Weekday-only requests select that weekday on or after the date being discussed, or filter an existing range. A chosen proposal supplies the next refinement anchor. Unavailable exact dates are stated explicitly and retained so another refinement can continue.
 
 All 67 automated tests pass. A live Groq check with a disposable local database passed: two weeks later → October 14; a day later → October 15; Thursday → October 15; Saturday → October 17 unavailable; Monday → October 19. No live database records were changed by this check.
+
+## Active appointment display — 2026-09-30
+
+The appointment list and chat appointment results include only confirmed and pending_scheduling records belonging to the session patient. Cancelled, rescheduled-original, completed and no_show rows remain stored but are omitted. Internal lookup remains available for ownership checks, relationship traversal and idempotent cancellation.
+
+## Environment configuration update
+
+The frontend is independent: frontend/.env supplies its required API base and optional font URL; its own build/dev server generates /frontend-config.js. Root .env holds Python settings and secrets. FastAPI permits the configured FRONTEND_URL through CORS and serves no UI files. See [deployment.md](deployment.md) for startup and hosting configuration.
+
+## Knowledge questions
+
+`POST /assistant/message` also supports insurance/general knowledge questions. Responses contain `data.kind=knowledge`, `grounded`, and source `citations`; see [RAG and safeguards](rag-and-safety.md). They never mutate bookings or return a confirmation token. Emergency screening produces contact guidance without claiming dispatch or escalation.

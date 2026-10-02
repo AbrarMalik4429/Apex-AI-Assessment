@@ -50,11 +50,11 @@ def test_cancellation_success_and_already_cancelled(harness):
     client, factory, fake, _ = harness
     booking_id = add_booking(factory)
     fake.queue.append(intent("cancel", booking_id=str(booking_id)))
-    proposal = send(client).json()
+    proposal = send(client, f"Cancel booking {booking_id}").json()
     result = send(client, "confirm", confirmation_token=proposal["confirmation_token"]).json()
     assert result["status"] == "success" and result["data"]["booking"]["status"] == "cancelled"
     fake.queue.append(intent("cancel", booking_id=str(booking_id)))
-    assert "already cancelled" in send(client).json()["message"]
+    assert "already cancelled" in send(client, f"Cancel booking {booking_id}").json()["message"]
 
 
 def test_persisted_state_survives_new_client(harness):

@@ -25,6 +25,9 @@ class Interpretation(BaseModel):
         "appointments",
         "continue",
         "unknown",
+        "knowledge",
+        "emergency",
+        "refuse",
     ]
     doctor_query: str | None
     specialty: str | None
@@ -92,3 +95,10 @@ class GuidedRequest(BaseModel):
     appointment_date: date | None = None
     start_time: time | None = None
     booking_id: UUID | None = None
+
+
+class KnowledgeSelection(BaseModel):
+    """The model selects evidence; it cannot invent answer prose or citations."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+    chunk_ids: list[str] = Field(max_length=3)

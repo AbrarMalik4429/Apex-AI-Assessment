@@ -1,6 +1,6 @@
-# RAG and knowledge-base requirements — planning only
+# RAG and knowledge-base requirements — implementation checkpoint
 
-This records the requirements discussion. RAG has not been implemented in the booking backend.
+RAG is now integrated using the supplied knowledge base. See `rag-and-safety.md` for the implemented communication path and limitations.
 
 ## Direct RAG requirements
 
@@ -21,4 +21,4 @@ Clarify ambiguous requests, return the required structured response, handle prom
 
 ## Source-data boundary
 
-No approved clinic knowledge base was supplied. Implementation will need approved source documents or explicitly labelled synthetic demonstration material. Do not invent Apex policies, insurance coverage or clinical preparation instructions and present them as real clinic facts.
+The user supplied ten documents and 152 chunks in files (2).zip. Historical/demo content is qualified and procedural first aid is retained for review rather than served. Do not invent Apex policies, insurance coverage or clinical preparation instructions and present them as real clinic facts.

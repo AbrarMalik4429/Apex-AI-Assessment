@@ -10,7 +10,12 @@ from tests.conftest import intent
 
 
 def config(**kwargs):
-    return Settings(_env_file=None, groq_api_key="synthetic-test-key", **kwargs)
+    return Settings(
+        _env_file=None,
+        groq_api_key="synthetic-test-key",
+        groq_api_url="https://api.groq.com/openai/v1/chat/completions",
+        **kwargs,
+    )
 
 
 def completion(data=None, finish="stop"):

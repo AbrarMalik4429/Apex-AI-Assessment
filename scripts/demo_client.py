@@ -5,9 +5,14 @@ from uuid import uuid4
 
 import httpx
 
+from app.config import Settings
+
 
 def main():
-    with httpx.Client(base_url="http://127.0.0.1:8000", timeout=45) as client:
+    settings = Settings()
+    if not settings.backend_url:
+        raise SystemExit("Set BACKEND_URL in .env first.")
+    with httpx.Client(base_url=settings.backend_url, timeout=45) as client:
         response = client.post("/demo/session")
         response.raise_for_status()
         client.headers["Authorization"] = "Bearer " + response.json()["access_token"]

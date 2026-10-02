@@ -2,15 +2,15 @@ services:
   db:
     image: postgres:17
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: booking
+      POSTGRES_USER: ${LOCAL_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${LOCAL_POSTGRES_DB}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "${LOCAL_DATABASE_BIND}"
     volumes:
       - booking_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d booking"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 3s
       timeout: 3s
       retries: 15
@@ -18,9 +18,10 @@ services:
     build: .
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/booking
+      DATABASE_URL: ${DOCKER_DATABASE_URL}
+      APP_HOST: ${DOCKER_APP_HOST}
     ports:
-      - "127.0.0.1:8000:8000"
+      - "${DOCKER_API_BIND}"
     depends_on:
       db:
         condition: service_healthy

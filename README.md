@@ -1,10 +1,12 @@
+> **Current setup:** separate frontend and backend. Start both using [these commands](docs/deployment.md). The website is now on local port 5173; the API remains on 8000.
+
 # What Works, What Does Not, What I Would Build Next
 
 This is the booking portion of the Apex patient-service assessment: a Python REST backend using Supabase PostgreSQL and Groq for intent extraction. It follows the agreed booking workflow and assumes doctor-side schedules are correct.
 
-**Works:** authenticated demo sessions; doctor search by name/specialty or previously seen doctor; patient-aware availability; database-enforced confirmed slot/date uniqueness; booking, lookup, cancellation, rescheduling and existing follow-up scheduling; clarification and numbered options; explicit confirmation; durable sequential request replay; structured Groq output with local validation; bounded provider retries; database error handling; atomic rescheduling; migrations, seed data, Docker configuration and automated tests.
+**Works:** source-cited extractive RAG over the supplied knowledge base; real booking UUID display/selection; layered prompt-injection defenses; authenticated demo sessions; doctor search by name/specialty or previously seen doctor; patient-aware availability; database-enforced confirmed slot/date uniqueness; booking, lookup, cancellation, rescheduling and existing follow-up scheduling; clarification and numbered options; explicit confirmation; durable sequential request replay; structured Groq output with local validation; bounded provider retries; database error handling; atomic rescheduling; migrations, seed data, Docker configuration and automated tests.
 
-**Not included:** preparation, insurance/general questions, RAG, human escalation delivery, OTP or production authentication, doctor-side schedule editing, symptom-to-specialty inference, variable appointment durations, comprehensive concurrency safety, multi-branch scheduling, and one-off extra slots. The demo endpoint intentionally grants access to one synthetic patient and must stay disabled outside a local synthetic demo. Natural-language quality is not measured by the mocked tests.
+**Not included:** preparation instructions, procedural first-aid advice, human escalation delivery, OTP or production authentication, doctor-side schedule editing, symptom-to-specialty inference, variable appointment durations, comprehensive concurrency safety, multi-branch scheduling, and one-off extra slots. The demo endpoint intentionally grants access to one synthetic patient and must stay disabled outside a local synthetic demo. Natural-language quality is not measured by the mocked tests.
 
 **Live database verified:** Apex AI Arabia is provisioned, seeded and connected through Supabase's session pooler with certificate and hostname verification. Nine API/database smoke checks passed against PostgreSQL, with all test writes rolled back. The dedicated runtime login and local `.env` are configured on this machine. Groq is configured locally and a live conversation smoke check passed; Docker execution remains unverified. See `docs/supabase-setup.md` for the current project setup.
 
@@ -12,20 +14,20 @@ This is the booking portion of the Apex patient-service assessment: a Python RES
 
 ## Chatbot demo
 
-Open http://127.0.0.1:8000/ after starting the server. All patient interactions happen in the conversation: booking, availability, appointment lookup, rescheduling, cancellation and existing follow-ups. Doctor/time choices, appointment cards and explicit confirmation buttons appear inline. You can also type replies such as `Option 1`, `yes`, or a new date. The page uses `/assistant/message` for every conversation action; the earlier guided endpoint remains available for API compatibility.
+Run the Python API and the independent frontend in two terminals (see [startup and deployment](docs/deployment.md)), then open http://127.0.0.1:5173/. All patient interactions happen in the conversation: booking, availability, appointment lookup, rescheduling, cancellation and existing follow-ups. Doctor/time choices, appointment cards and explicit confirmation buttons appear inline. You can also type replies such as `Option 1`, `yes`, or a new date. The page uses `/assistant/message` for every conversation action; the earlier guided endpoint remains available for API compatibility.
 
-The Groq key is configured locally and a real-provider, rollback-isolated smoke test passed all six booking families. A fresh installation still needs its own key. Groq interprets natural language; Python enforces ownership, availability and booking policies. Exact numbered choices, reset and confirmation do not need model calls. Preparation, insurance/general knowledge and escalation delivery remain out of scope.
+The Groq key is configured locally and a real-provider, rollback-isolated smoke test passed all six booking families. A fresh installation still needs its own key. Groq interprets natural language; Python enforces ownership, availability and booking policies. Exact numbered choices, reset and confirmation do not need model calls. Insurance/general knowledge retrieval is now integrated. Preparation content and escalation delivery remain unavailable. See `docs/rag-and-safety.md`.
 
 The transcript and pending request are kept in sessionStorage for the browser tab. On an uncertain response, the chat blocks new actions and offers a retry with the identical request ID and payload, including after a reload. A expired session requires reconnection and checking existing appointments before repeating an uncertain change. No provider keys or database credentials are sent to the browser.
 
-No frontend build step is required; FastAPI serves `app/static`. Google Fonts is optional; system fonts are used if unavailable. This is a synthetic demo, not production patient authentication.
+The independent frontend is in `frontend/`: use `npm run dev` locally and `npm run build` for Vercel. FastAPI serves only the API. Google Fonts is optional; system fonts are used if unavailable. This is a synthetic demo, not production patient authentication.
 
 ## Already configured on this machine
 
 The existing local `.env` contains the verified Supabase connection and generated backend credential. Do not overwrite it with `.env.example`. Your Groq key is now configured locally. Run the API from this folder:
 
 ```powershell
-& '..\..\work\.venv\Scripts\python.exe' -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+& '..\..\work\.venv\Scripts\python.exe' -m scripts.run_server
 ```
 
 The database migrations and synthetic seed have already been applied. The runtime login intentionally cannot apply future migrations or write doctor-side seed data. Use the connected Supabase migration tools or a separate administrator connection for those operations. The ZIP excludes `.env` and all credentials.
@@ -54,13 +56,13 @@ For a new database, use an administrator connection to apply migrations and load
 ```powershell
 python -m alembic upgrade head
 python -m app.seed
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+python -m scripts.run_server
 ```
 
 Open [Swagger API documentation](http://127.0.0.1:8000/docs). In another activated terminal:
 
 ```powershell
-python scripts/demo_client.py
+python -m scripts.demo_client
 ```
 
 Try: `Book Dr. Amal after two months`, `Book Dr. Amal between 2026-11-02 and 2026-11-13`, or `Book Dr. Amal tomorrow afternoon`, choose a numbered time, then type `confirm`. The client attaches the returned confirmation token. Type `retry` after an uncertain response; it reuses the identical request ID and payload. `reset` clears the pending workflow. It never prints your API key or session token.
@@ -126,6 +128,8 @@ The client makes at most two attempts for 429/5xx responses, with a short bounde
 
 ## Design and implementation documents
 
+- `docs/chatbot-python-sql-communication.md`: complete communication contracts, SQL interaction, scenario walkthroughs and assessment mapping.
+
 - `docs/database.md`: relationships, constraints, trust boundaries and assumptions.
 - `docs/api-workflow.md`: endpoint contracts, confirmation flow and state transitions.
 - `docs/openapi.json`: generated API schema; `/docs` serves the running version.
@@ -142,3 +146,25 @@ Cancellation at or below 24 hours requires approval; no appointment mutation or 
 This was built with Codex assistance for design, coding, documentation and test creation. Provider behaviour was checked against official Groq documentation. Automated checks validate the implemented code paths; the candidate should review, run against their own test services, and be able to explain the design before submission. This booking-only deliverable is not the complete assessment submission.
 
 Sources checked on 2026-09-28: [Groq structured outputs](https://console.groq.com/docs/structured-outputs), [Groq rate limits](https://console.groq.com/docs/rate-limits), [Groq API reference](https://console.groq.com/docs/api-reference), [Supabase connection options](https://supabase.com/docs/guides/database/connecting-to-postgres), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
+
+## Environment-based URLs and startup
+
+Backend service URLs are configured in root `.env`; public frontend URLs are configured in `frontend/.env` (each has its own `.env.example`). The existing local secrets have been preserved. Restart the server after changing configuration; refresh the browser to load its new public configuration.
+
+| Variable | Purpose |
+|---|---|
+| `BACKEND_URL` | API base URL used by the terminal demo client. |
+| `FRONTEND_API_BASE_URL` | Required browser API address in **frontend/.env**. May include an API path prefix. |
+| `FRONTEND_URL` | Allowed frontend origin for CORS, with no path. |
+| `GROQ_API_URL` | Full HTTPS chat-completions endpoint. Server-only. |
+| `FRONTEND_FONT_URL` | Optional stylesheet URL in **frontend/.env**. Empty uses system fonts. |
+| `DATABASE_URL` | PostgreSQL connection string. Server-only. |
+| `APP_HOST`, `APP_PORT` | Listen address and port for `python -m scripts.run_server`. |
+
+The frontend serves its own public `/frontend-config.js`, generated by the Node build/dev scripts. Only the API base and optional font URL are exposed. FastAPI does not serve frontend files. The browser calls the configured API address directly; CORS permits the exact `FRONTEND_URL`. See [deployment.md](docs/deployment.md) for the Render/Vercel split and two-terminal startup.
+
+For Docker Compose, `.env` also supplies `DOCKER_DATABASE_URL`, `DOCKER_APP_HOST`, `DOCKER_API_BIND`, `LOCAL_DATABASE_BIND`, and local PostgreSQL settings. The API container must listen on `0.0.0.0`; the included Docker variable sets that without changing the local host setting. Keep the container side of `DOCKER_API_BIND` aligned with `APP_PORT`. Compose remains the local synthetic database setup; deployment values must be supplied for the target environment.
+
+## Knowledge-base checkpoint
+
+See [RAG and safeguards](docs/rag-and-safety.md) for source coverage, current policy overrides, response examples, confidence caveats and the deployment handoff. `knowledge-base/` must be included with the backend deployment. It is not a frontend asset and is not publicly mounted.

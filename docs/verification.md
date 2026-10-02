@@ -73,3 +73,26 @@ Live Supabase verification confirms eight templates for each weekday 0–4 for b
 Natural-language extraction distinguishes days from today (`days_after`), offsets from the current date/window (`shift_days`), and weekday-only refinements (`requested_weekday`, Monday=0). Python calculates dates. Weekday-only requests select that weekday on or after the date being discussed, or filter an existing range. A chosen proposal supplies the next refinement anchor. Unavailable exact dates are stated explicitly and retained so another refinement can continue.
 
 All 67 automated tests pass. A live Groq check with a disposable local database passed: two weeks later → October 14; a day later → October 15; Thursday → October 15; Saturday → October 17 unavailable; Monday → October 19. No live database records were changed by this check.
+
+Active-list update: all 69 automated tests pass, including status filtering, patient ownership, retained historical rows, and displaying only the confirmed replacement after rescheduling.
+
+URL configuration update: 72 automated tests pass, including public-config allowlisting, CORS origin checks, HTTPS provider validation and a custom provider endpoint. Docker configuration was updated but not run.
+
+
+## 2026-10-01: booking IDs, knowledge retrieval and safeguards
+
+- Automated regression suite: **100 passed**. Covers actual UUID selection, rejection of model-invented IDs, patient ownership, source allowlists, benefit retrieval, historical/outdated caveats, injection screening, poisoned-source exclusion, knowledge-turn confirmation invalidation, replay and existing booking/date workflows.
+- Ruff checks and frontend JavaScript syntax validation passed.
+- Real Groq checks with a disposable SQLite database verified seven scenarios across paced runs: pre-authorization, historical Tawuniya Gold information, Bupa dental verification, cancellation policy, configured booking horizon, missing clinic address, and absent fasting instructions. Initial testing exposed poor dental ranking; benefit-level passages corrected it. A provider rate limit was surfaced safely and subsequent checks were paced. This is a smoke evaluation, not a production quality guarantee.
+- Browser checks with mocked API responses verified visible UUIDs and UUID request payloads, original-booking display on reschedule, source rendering, rejection of unsafe citation URLs, text-only rendering of HTML-like source names, and desktop/mobile layout without horizontal overflow or JavaScript errors. Browser checks did not change live bookings.
+- Source material: ten documents / 152 original chunks; runtime adds benefit-level views and excludes unreviewed procedural first aid and obsolete instructions. See rag-and-safety.md for coverage and source-quality limits.
+- No live Supabase bookings or schema were changed for this checkpoint. Deployment remains the next requested task.
+
+
+Reported-query fix: 106 automated tests passed. The Bupa category overview, general FAQ menu and booking-help example also passed real Groq/local retrieval checks without database access. Ruff passed. Restart the VS Code server to load the changed prompts and index.
+
+
+2026-10-02 confidence correction: 112 automated tests passed; Ruff passed. The exact Al Rajhi overseas-use question passed a live Groq check. Per-benefit tags are checked across all four insurers; unknown/inferred/contract-dependent entries remain qualified. No booking database access or application restart was needed.
+
+
+2026-10-02 frontend separation: 112 backend tests and 3 Node frontend tests passed; frontend build and Ruff passed. Browser smoke testing used independent frontend/API processes, real CORS requests, a temporary SQLite database and stubbed Groq. Session initialization, knowledge reply, API docs link, private config exclusion and mobile sizing passed. Live database unchanged; no hosting deployment performed.

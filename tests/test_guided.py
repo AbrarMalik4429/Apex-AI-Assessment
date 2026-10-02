@@ -7,7 +7,7 @@ from tests.test_booking import add_booking
 def test_guided_booking_confirm_and_replay_without_model(harness):
     client, _, fake, _ = harness
     assert client.get("/").status_code == 200
-    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/static/app.js").status_code == 404
     body = dict(
         request_id=str(uuid4()),
         action="book",

@@ -80,7 +80,10 @@ def main():
                         interpreter.set(action, **fields)
                         result = client.post(
                             "/assistant/message",
-                            json={"request_id": str(uuid4()), "message": "synthetic smoke request"},
+                            json={
+                                "request_id": str(uuid4()),
+                                "message": "synthetic smoke request " + (booking_id or ""),
+                            },
                         )
                         assert result.status_code == 200, result.status_code
                         data = result.json()

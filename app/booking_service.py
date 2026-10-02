@@ -85,7 +85,10 @@ class BookingService:
         return list(
             self.db.scalars(
                 select(Booking)
-                .where(Booking.patient_id == self.patient_id)
+                .where(
+                    Booking.patient_id == self.patient_id,
+                    Booking.status.in_(("confirmed", "pending_scheduling")),
+                )
                 .order_by(Booking.created_at.desc(), Booking.booking_id)
             )
         )

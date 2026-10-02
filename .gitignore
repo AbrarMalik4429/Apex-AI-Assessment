@@ -8,3 +8,7 @@ __pycache__/
 .ruff_cache/
 *.db
 *.egg-info/
+
+frontend/dist/
+frontend/node_modules/
+frontend/.vercel/

@@ -96,3 +96,13 @@ Reported-query fix: 106 automated tests passed. The Bupa category overview, gene
 
 
 2026-10-02 frontend separation: 112 backend tests and 3 Node frontend tests passed; frontend build and Ruff passed. Browser smoke testing used independent frontend/API processes, real CORS requests, a temporary SQLite database and stubbed Groq. Session initialization, knowledge reply, API docs link, private config exclusion and mobile sizing passed. Live database unchanged; no hosting deployment performed.
+
+
+## 2026-10-06: Part 7 notice-policy regression coverage
+
+Added seven parametrized cases covering rescheduling notice boundaries, cancellation/rescheduling confirmation after crossing the notice threshold, and independent configured thresholds. Full backend suite: **119 passed**, using temporary SQLite databases and controlled model outputs. Ruff passed for the added test file. One existing Starlette/httpx TestClient deprecation warning remains. No live Groq/database calls or concurrency fix were performed. See [Part 7](part-7-automated-tests.md) for coverage and the highest-risk race-condition gap.
+
+
+## 2026-10-06: Part 8 container packaging replacement
+
+Replaced the backend-only/local-database Compose design with API and static frontend images using the configured database. Removed obsolete Docker variables from the example configuration; private .env files and existing data were preserved. 119 backend tests, 3 frontend tests, full Ruff and frontend build passed. YAML structure and public build arguments checked. Docker is not available, so image/Compose/Nginx runtime verification remains pending. See [Part 8](part-8-docker-and-code-quality.md).

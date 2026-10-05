@@ -1,133 +1,114 @@
-> **Current setup:** separate frontend and backend. Start both using [these commands](docs/deployment.md). The website is now on local port 5173; the API remains on 8000.
+# What Works, What Does Not, What I Would Build Next.
 
-# What Works, What Does Not, What I Would Build Next
+**Works:** Python/FastAPI booking, availability, active appointment lookup, confirmed cancellation/rescheduling, pending follow-ups and source-cited knowledge answers. The independent frontend talks to the API; Python controls ownership, policies and database writes.
 
-This is the booking portion of the Apex patient-service assessment: a Python REST backend using Supabase PostgreSQL and Groq for intent extraction. It follows the agreed booking workflow and assumes doctor-side schedules are correct.
+**Not production-ready:** shared synthetic demo login; no OTP, doctor-side management or submitted human escalation; incomplete concurrency protection. Docker files are provided, but container execution has not been verified on this machine.
 
-**Works:** source-cited extractive RAG over the supplied knowledge base; real booking UUID display/selection; layered prompt-injection defenses; authenticated demo sessions; doctor search by name/specialty or previously seen doctor; patient-aware availability; database-enforced confirmed slot/date uniqueness; booking, lookup, cancellation, rescheduling and existing follow-up scheduling; clarification and numbered options; explicit confirmation; durable sequential request replay; structured Groq output with local validation; bounded provider retries; database error handling; atomic rescheduling; migrations, seed data, Docker configuration and automated tests.
+**Next:** individual OTP login and patient-only records, database-backed race-condition fixes, then authenticated doctor-side workflows. See the [submission summary](<docs/What Works, What Does Not, What I Would Build Next.md>).
 
-**Not included:** preparation instructions, procedural first-aid advice, human escalation delivery, OTP or production authentication, doctor-side schedule editing, symptom-to-specialty inference, variable appointment durations, comprehensive concurrency safety, multi-branch scheduling, and one-off extra slots. The demo endpoint intentionally grants access to one synthetic patient and must stay disabled outside a local synthetic demo. Natural-language quality is not measured by the mocked tests.
+## Quick start
 
-**Live database verified:** Apex AI Arabia is provisioned, seeded and connected through Supabase's session pooler with certificate and hostname verification. Nine API/database smoke checks passed against PostgreSQL, with all test writes rolled back. The dedicated runtime login and local `.env` are configured on this machine. Groq is configured locally and a live conversation smoke check passed; Docker execution remains unverified. See `docs/supabase-setup.md` for the current project setup.
+For this existing workspace, use the copy-and-paste [VS Code startup guide](START-IN-VSCODE.md).
 
-**Build next:** database locking/overlap constraints and concurrent-request tests; verified patient identity; deployment hardening and per-patient database authorization if needed; real-model evaluations with consented synthetic cases; broader multilingual/date ambiguity evaluations; coordinated doctor-side schedule changes; operation retention and monitoring; the remaining assessment families. A process-local mutex alone would not protect multiple backend workers.
-
-## Chatbot demo
-
-Run the Python API and the independent frontend in two terminals (see [startup and deployment](docs/deployment.md)), then open http://127.0.0.1:5173/. All patient interactions happen in the conversation: booking, availability, appointment lookup, rescheduling, cancellation and existing follow-ups. Doctor/time choices, appointment cards and explicit confirmation buttons appear inline. You can also type replies such as `Option 1`, `yes`, or a new date. The page uses `/assistant/message` for every conversation action; the earlier guided endpoint remains available for API compatibility.
-
-The Groq key is configured locally and a real-provider, rollback-isolated smoke test passed all six booking families. A fresh installation still needs its own key. Groq interprets natural language; Python enforces ownership, availability and booking policies. Exact numbered choices, reset and confirmation do not need model calls. Insurance/general knowledge retrieval is now integrated. Preparation content and escalation delivery remain unavailable. See `docs/rag-and-safety.md`.
-
-The transcript and pending request are kept in sessionStorage for the browser tab. On an uncertain response, the chat blocks new actions and offers a retry with the identical request ID and payload, including after a reload. A expired session requires reconnection and checking existing appointments before repeating an uncertain change. No provider keys or database credentials are sent to the browser.
-
-The independent frontend is in `frontend/`: use `npm run dev` locally and `npm run build` for Vercel. FastAPI serves only the API. Google Fonts is optional; system fonts are used if unavailable. This is a synthetic demo, not production patient authentication.
-
-## Already configured on this machine
-
-The existing local `.env` contains the verified Supabase connection and generated backend credential. Do not overwrite it with `.env.example`. Your Groq key is now configured locally. Run the API from this folder:
-
-```powershell
-& '..\..\work\.venv\Scripts\python.exe' -m scripts.run_server
-```
-
-The database migrations and synthetic seed have already been applied. The runtime login intentionally cannot apply future migrations or write doctor-side seed data. Use the connected Supabase migration tools or a separate administrator connection for those operations. The ZIP excludes `.env` and all credentials.
-
-## Quick start on Windows
-
-Install Python 3.12+ and either use a Supabase PostgreSQL database or start the local PostgreSQL container described below. Open a terminal in this folder.
+Requires Python 3.12+, Node.js 22+ and a configured PostgreSQL database. Run commands from the repository root (the backend root). The frontend root is `frontend/`. Copy examples only if the real files do not already exist:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.lock
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-notepad .env
+if (-not (Test-Path frontend/.env)) { Copy-Item frontend/.env.example frontend/.env }
 ```
 
-Edit the local `.env`:
+Set backend `.env`: `DATABASE_URL`, `DATABASE_SSL_ROOT_CERT`, `GROQ_API_KEY`, `GROQ_API_URL`, `GROQ_MODEL`, `FRONTEND_URL`, `APP_HOST`, `APP_PORT`. Enable `DEMO_ENABLED=true` only for a restricted synthetic demo. Frontend `frontend/.env` needs `FRONTEND_API_BASE_URL`, `FRONTEND_HOST`, `FRONTEND_PORT`; the font URL is optional. Keep all credentials out of frontend settings and Git.
 
-- Set `GROQ_API_KEY` to your existing Groq key. Do not paste it into chat, commit it, or put it in a browser client. `.env` is excluded from Git and Docker builds.
-- Set `DATABASE_URL` to your Supabase direct or session-pooler connection, using the `postgresql+psycopg://` driver and TLS. URL-encode special characters in the database password. Copy connection details from your project's Connect panel; do not guess its hostname.
-- For the local synthetic demo only, set `DEMO_ENABLED=true`.
-- Leave `GROQ_MODEL=openai/gpt-oss-20b` and `GROQ_RESPONSE_MODE=strict` initially. This is a Groq-hosted model; no OpenAI API key or OpenAI endpoint is used.
-
-For a new database, use an administrator connection to apply migrations and load synthetic fixtures before switching to your runtime connection. These steps are already complete for Apex AI Arabia:
+Use the existing provisioned database without reseeding. For a **new disposable database only**, run migrations and seed with a role permitted to create the schema:
 
 ```powershell
 python -m alembic upgrade head
 python -m app.seed
+```
+
+Start the API:
+
+```powershell
 python -m scripts.run_server
 ```
 
-Open [Swagger API documentation](http://127.0.0.1:8000/docs). In another activated terminal:
+In a second terminal:
 
 ```powershell
-python -m scripts.demo_client
+cd frontend
+npm.cmd ci --ignore-scripts
+npm.cmd run dev
 ```
 
-Try: `Book Dr. Amal after two months`, `Book Dr. Amal between 2026-11-02 and 2026-11-13`, or `Book Dr. Amal tomorrow afternoon`, choose a numbered time, then type `confirm`. The client attaches the returned confirmation token. Type `retry` after an uncertain response; it reuses the identical request ID and payload. `reset` clears the pending workflow. It never prints your API key or session token.
+Open the address configured in `FRONTEND_URL` (example: `http://127.0.0.1:5173`). API docs are at `BACKEND_URL` plus `/docs`. Ports and origins must match across both environment files. Full variable tables, absolute paths and the existing workspace Python command are in [local development](docs/local-development.md).
 
-## Supabase database setup
+## Docker: frontend and backend
 
-The Alembic migration creates a private `booking` schema. Keep it out of Supabase's exposed Data API schemas. It revokes schema access from PUBLIC and enables RLS on domain/session/operation tables without public policies. The browser interacts only with FastAPI.
-
-The configured Supabase project uses separate access: migrations run through the administrator connector, while Python uses `booking_runtime`. This role cannot bypass RLS, delete records, manage roles/schemas or modify doctor-side schedules. Role-specific policies permit only the approved backend operations. Those policies trust the backend across its patients; per-patient ownership is enforced in Python and tested. No policies grant access to `anon` or `authenticated`.
-
-The working connection uses the Supabase session pooler, `sslmode=verify-full`, and the public CA certificate in `certs/supabase-ca.crt`. `DATABASE_SSL_ROOT_CERT` selects that certificate; if omitted, the application uses certifi's public trust bundle. An explicit `sslrootcert` URL parameter takes precedence. Transaction-mode pooling remains unverified. Never commit the database connection string.
-
-The migration does not create a Supabase project or alter existing patient records. Seed only a dedicated synthetic demo database. The seed is idempotent when its demo patient already exists.
-
-## Local PostgreSQL and Docker
-
-To use local PostgreSQL while running Python on your host:
+Requires Docker Engine/Desktop with Compose v2 and Linux containers. With both environment files configured:
 
 ```powershell
-docker compose up -d db
+docker compose --env-file .env --env-file frontend/.env config --quiet
+docker compose --env-file .env --env-file frontend/.env up --build -d
+docker compose --env-file .env --env-file frontend/.env ps
 ```
 
-The local credentials in `.env.example` match this container. To run the API in Docker too, create `.env`, add the Groq key, and enable the synthetic demo first:
+Compose uses the configured database; it does not create, seed or replace it. The frontend's API URL is browser-facing, not the internal container name. Backend and frontend publish to loopback by default. Stop with the same command prefix followed by `down`. Detailed setup, health checks and troubleshooting: [Part 8 — Docker & Code Quality](docs/part-8-docker-and-code-quality.md).
 
-```powershell
-docker compose build api
-docker compose run --rm api python -m alembic upgrade head
-docker compose run --rm api python -m app.seed
-docker compose up -d api
-```
-
-Compose deliberately overrides the database URL to use its local `db` service. For Supabase, run Python on the host, or run the built API image with your Supabase `.env` outside this local Compose configuration. The Dockerfile does not bake in secrets. One worker is configured for the demo; even one worker does not eliminate concurrent-request races.
-
-## Tests
+## Build, tests and hosting
 
 ```powershell
 python -m pip install -r requirements-dev.lock
 python -m pytest -q
 python -m ruff check .
+npm.cmd --prefix frontend test
+npm.cmd --prefix frontend run build
 ```
 
-For actual PostgreSQL verification, set `TEST_DATABASE_URL` locally to a **test** database connection before running the same suite. The suite creates and drops `booking_test_<random>` schemas, applies the frozen SQL migration, and seeds synthetic data. It does not touch the application's `booking` schema. The supplied role needs schema creation permissions. Do not point tests at production.
+Frontend output: `frontend/dist/`. Python uses the locked dependency installation rather than a separate compilation step. Latest recorded backend result: **119 passed**; see [verification](docs/verification.md) for test scope and remaining gaps.
 
-The tests cover ownership, filtering across doctors, partial leave, adjacent slots, clarification, confirmation, follow-ups, policy boundaries, stale choices, atomic rollback, replay after a lost commit acknowledgement, and Groq errors. They do not establish real-model intent accuracy, network performance, production authentication or race safety. See `docs/verification.md` for the actual checks performed on this build and `docs/evaluations.md` for expected behaviours.
+| Host | Root | Build | Start/output |
+|---|---|---|---|
+| Vercel frontend | `frontend` | `npm ci --ignore-scripts` then `npm run build` | `dist` |
+| Render API | Repository root | `pip install -r requirements.lock` | `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 
-## Groq behaviour and troubleshooting
+URLs and secrets belong in each host's environment settings. No deployment is performed by these files. See [deployment](docs/deployment.md).
 
-Only the user's current message and compact scheduling context are sent to Groq. The backend does not send stored names, phone numbers, patient IDs, booking notes, session tokens or database credentials. User-entered text may itself contain personal information; use synthetic data for the assessment. No raw request or provider response logging is implemented.
+## Repository structure
 
-| Error code | Meaning and next step |
-|---|---|
-| `groq_not_configured` | Add the key locally and restart the backend. |
-| `groq_authentication_failed` | Check the key and account access in Groq Console; no automatic retry. |
-| `groq_rate_limited` | Respect the returned Retry-After header. Retry the same request later. Account limits vary. |
-| `groq_request_rejected` | Check model availability and structured-output support. No silent switch to weaker output mode. |
-| `groq_invalid_output` | JSON/schema or completion validation failed. No booking tool ran. |
-| `groq_timeout` / `groq_unreachable` | No interpreted action was executed; retry later. |
-| `database_outcome_unknown` | The write may have committed. Retry identical input with the same request ID before starting another change. |
+```text
+app/                 API, validated contracts, workflow, booking service, retrieval
+frontend/            Browser source, Node build/tests, static-server Dockerfile
+knowledge-base/      Backend-only source documents, chunks and metadata
+migrations/          Versioned database schema changes
+scripts/             Launch and diagnostic commands
+certs/               Public database CA certificate
+tests/               Automated backend tests
+docs/                Assessment, setup and verification documents
+Dockerfile           Non-root Python API image
+compose.yaml         Two-service local container setup
+```
 
-Strict JSON schema is the default. If deliberately using a different Groq model that supports only JSON object mode, set `GROQ_RESPONSE_MODE=json`; local Pydantic validation still rejects unexpected fields/types. Do not expect schema validation to guarantee semantic correctness. All writes require a server-stored proposal and explicit confirmation token.
+Dependencies are declared in `pyproject.toml` and pinned in `requirements.lock` / `requirements-dev.lock`; frontend metadata and lockfile are under `frontend/`. Read [AI/tools disclosure](docs/ai-tools-and-technologies-disclosure.md) for development assistance and evidence boundaries.
 
-The client makes at most two attempts for 429/5xx responses, with a short bounded delay. A longer Retry-After is returned immediately. Timeouts, invalid JSON and authentication errors are not automatically retried. No provider tools, streaming or autonomous tool loop are used. Confirming a proposal makes **no LLM call**.
+## Assessment documents
 
-## Design and implementation documents
+- [Part 8 — Docker & Code Quality](docs/part-8-docker-and-code-quality.md): container design, dependencies, structure and verification limits.
 
+- [Part 12 — Debugging Case](docs/part-12-debugging-case.md): reproduce, diagnose, fix and test a false reschedule-success claim after a timeout.
+- [Bonus — Judgment Challenge](docs/bonus-judgment-challenge.md): a clearly labelled hypothetical leadership instruction, challenged in under 400 words.
+- [AI, Tools and Technologies Disclosure](docs/ai-tools-and-technologies-disclosure.md): assistance, runtime stack, verification evidence and unfinished features.
+- [Part 13 — Engineer-to-Business Communication](docs/part-13-engineer-to-business-communication.md): a short customer explanation of AI limitations, reliability checks and human approval for late changes.
+- [Part 9 — Model / Cost Comparison](docs/part-9-model-cost-comparison.md): configured Groq 120B versus Claude Haiku 4.5, 100,000-interaction budget and explicit latency assumptions.
+- [Part 7 — Automated Tests](docs/part-7-automated-tests.md): core/failure coverage, added notice-policy tests, results and the highest-risk concurrency gap.
+- [Part 11 — Workflow vs Agent](docs/part-11-workflow-vs-agent.md): why deterministic controls govern appointment changes, particularly the 24-hour cancellation/rescheduling boundary.
+- [Final submission summary](<docs/What Works, What Does Not, What I Would Build Next.md>): what works, what remains limited and the three next-version priorities.
+- [Part 10 — Production Architecture](docs/part-10-production-architecture.md): target architecture diagram and changes required before real patient deployment.
+- [Part 6 — Evaluation](docs/part-6-evaluation.md): 24 booking, adversarial and knowledge-base cases with expected behaviour, pass/fail criteria and a results template.
+- [Part 5 — Guardrails & Failure Handling](docs/part-5-guardrails-and-failure-handling.md): ambiguity, unavailable slots, invalid IDs/errors, injection, sensitive information and human-approval boundaries.
+- [Preventing unsupported knowledge-base claims](docs/part-2-rag-preventing-unsupported-kb-claims.md): evidence selection, deterministic safeguards, qualifications, fallback responses, examples and limitations.
 - `docs/chatbot-python-sql-communication.md`: complete communication contracts, SQL interaction, scenario walkthroughs and assessment mapping.
 
 - `docs/database.md`: relationships, constraints, trust boundaries and assumptions.
@@ -137,34 +118,3 @@ The client makes at most two attempts for 429/5xx responses, with a short bounde
 - `docs/verification.md`: verification evidence and remaining gaps.
 - `docs/booking-workflow.md`: agreed source workflow, retained as a design reference.
 
-## Assumptions and disclosure
-
-Slots are complete, valid, non-overlapping doctor-side appointment templates. Each booking uses exactly one slot; appointment type is descriptive and does not change its duration. Templates are same-day intervals in the configured clinic timezone (`Asia/Riyadh` by default). Monday is weekday 0. All patient-specific data access derives identity from the server-issued session.
-
-Cancellation at or below 24 hours requires approval; no appointment mutation or escalation submission occurs. The same default applies to rescheduling as an explicit assumption from the workflow notes and can be changed independently through `RESCHEDULE_NOTICE_HOURS`. Past appointments cannot be changed. Unscheduled follow-ups are scheduled in place and keep their original clinical parent reference. Rescheduling preserves the old row and adds a replacement pointer; child links to the original visit remain historical links.
-
-This was built with Codex assistance for design, coding, documentation and test creation. Provider behaviour was checked against official Groq documentation. Automated checks validate the implemented code paths; the candidate should review, run against their own test services, and be able to explain the design before submission. This booking-only deliverable is not the complete assessment submission.
-
-Sources checked on 2026-09-28: [Groq structured outputs](https://console.groq.com/docs/structured-outputs), [Groq rate limits](https://console.groq.com/docs/rate-limits), [Groq API reference](https://console.groq.com/docs/api-reference), [Supabase connection options](https://supabase.com/docs/guides/database/connecting-to-postgres), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
-
-## Environment-based URLs and startup
-
-Backend service URLs are configured in root `.env`; public frontend URLs are configured in `frontend/.env` (each has its own `.env.example`). The existing local secrets have been preserved. Restart the server after changing configuration; refresh the browser to load its new public configuration.
-
-| Variable | Purpose |
-|---|---|
-| `BACKEND_URL` | API base URL used by the terminal demo client. |
-| `FRONTEND_API_BASE_URL` | Required browser API address in **frontend/.env**. May include an API path prefix. |
-| `FRONTEND_URL` | Allowed frontend origin for CORS, with no path. |
-| `GROQ_API_URL` | Full HTTPS chat-completions endpoint. Server-only. |
-| `FRONTEND_FONT_URL` | Optional stylesheet URL in **frontend/.env**. Empty uses system fonts. |
-| `DATABASE_URL` | PostgreSQL connection string. Server-only. |
-| `APP_HOST`, `APP_PORT` | Listen address and port for `python -m scripts.run_server`. |
-
-The frontend serves its own public `/frontend-config.js`, generated by the Node build/dev scripts. Only the API base and optional font URL are exposed. FastAPI does not serve frontend files. The browser calls the configured API address directly; CORS permits the exact `FRONTEND_URL`. See [deployment.md](docs/deployment.md) for the Render/Vercel split and two-terminal startup.
-
-For Docker Compose, `.env` also supplies `DOCKER_DATABASE_URL`, `DOCKER_APP_HOST`, `DOCKER_API_BIND`, `LOCAL_DATABASE_BIND`, and local PostgreSQL settings. The API container must listen on `0.0.0.0`; the included Docker variable sets that without changing the local host setting. Keep the container side of `DOCKER_API_BIND` aligned with `APP_PORT`. Compose remains the local synthetic database setup; deployment values must be supplied for the target environment.
-
-## Knowledge-base checkpoint
-
-See [RAG and safeguards](docs/rag-and-safety.md) for source coverage, current policy overrides, response examples, confidence caveats and the deployment handoff. `knowledge-base/` must be included with the backend deployment. It is not a frontend asset and is not publicly mounted.

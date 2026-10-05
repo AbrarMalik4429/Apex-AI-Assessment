@@ -1,29 +1,24 @@
+name: apex-patient-demo
 services:
-  db:
-    image: postgres:17
-    environment:
-      POSTGRES_USER: ${LOCAL_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${LOCAL_POSTGRES_DB}
-    ports:
-      - "${LOCAL_DATABASE_BIND}"
-    volumes:
-      - booking_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 3s
-      timeout: 3s
-      retries: 15
   api:
     build: .
     env_file: .env
     environment:
-      DATABASE_URL: ${DOCKER_DATABASE_URL}
-      APP_HOST: ${DOCKER_APP_HOST}
+      APP_HOST: 0.0.0.0
+      APP_PORT: "8000"
     ports:
-      - "${DOCKER_API_BIND}"
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8000}:8000"
+    init: true
+    restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        FRONTEND_API_BASE_URL: ${FRONTEND_API_BASE_URL:?Load frontend/.env with --env-file}
+        FRONTEND_FONT_URL: ${FRONTEND_FONT_URL:-}
+    ports:
+      - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-5173}:8080"
     depends_on:
-      db:
+      api:
         condition: service_healthy
-volumes:
-  booking_data:
+    restart: unless-stopped
